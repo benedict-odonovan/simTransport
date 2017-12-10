@@ -36,7 +36,7 @@ class Board {
         for (let x = 0; x < window.innerWidth; x += this.gridSize) {
             this.cells.push([]);
             for (let y = 0; y < window.innerHeight; y += this.gridSize) {
-                const cell = { x: x, y: y };
+                const cell = new Cell(x, y);
                 this.cells[x / this.gridSize].push(cell);
                 i++;
             }
@@ -100,21 +100,12 @@ class Board {
 
         // Only add road on the second click
         if (!this.roadStart) {
-            this.roadStart = { x: x, y: y };
+            this.roadStart = new Cell(x, y);
         } else {
-            const newRoad = new Road();
-            newRoad.from = this.roadStart;
-            newRoad.to = { x: x, y: y };
-
-            // from should always be the point closest to the top left
-            if (newRoad.from.x + newRoad.from.y > newRoad.to.x + newRoad.to.y) {
-                const placeHolder = newRoad.from;
-                newRoad.from = newRoad.to;
-                newRoad.to = placeHolder;
-            }
+            const newRoad = new Road(this.roadStart, new Cell(x, y));
 
             // No duplicates
-            if (this.roads.every(road => JSON.stringify(road) !== JSON.stringify(newRoad))) {
+            if (this.roads.every(road => road.id !== newRoad.id)) {
                 this.createNewRoad(newRoad);
             }
             this.roadStart = null;
@@ -162,8 +153,8 @@ class Board {
             b = numerator2 / denominator;
 
             // if we cast these lines infinitely in both directions, they intersect here:
-            result.x = line1StartX + (a * (line1EndX - line1StartX));
-            result.y = line1StartY + (a * (line1EndY - line1StartY));
+            result.x = Math.round(line1StartX + (a * (line1EndX - line1StartX)));
+            result.y = Math.round(line1StartY + (a * (line1EndY - line1StartY)));
             /*
                     // it is worth noting that this should be the same as:
                     x = line2StartX + (b * (line2EndX - line2StartX));
@@ -185,9 +176,8 @@ class Board {
         this.roads.forEach(road => {
             const intercept = getIntersection(road.from.x, road.from.y, road.to.x, road.to.y, newR.from.x, newR.from.y, newR.to.x, newR.to.y);
             if (intercept.onLine1 && intercept.onLine2) {
-                const intCell: Cell = { x: intercept.x, y: intercept.y };
-
-                const newRoad: Road = { from: intCell, to: road.to }
+                const intCell = new Cell(intercept.x, intercept.y);
+                const newRoad = new Road(intCell, road.to);
                 newRSplits.push(intCell);
                 this.roads.push(newRoad);
                 road.to = intCell;
@@ -196,7 +186,7 @@ class Board {
 
         // Sort the new road in order to keep things simple when splitting
         newRSplits.sort((a, b) => {
-            return (a.x + a.y) - (b.x + b.y)
+            return (b.x + b.y) - (a.x + a.y)
         });
 
         newRSplits.forEach(split => {
@@ -208,11 +198,12 @@ class Board {
         newRParts.push(newR);
 
         this.roads = this.roads.concat(newRParts);
+        this.removeDuplicates();
     }
 
     splitRoad(road: Road, intCell: Cell): Road[] {
-        const road1: Road = { from: road.from, to: intCell };
-        const road2: Road = { from: intCell, to: road.to };
+        const road1 = new Road(road.from, intCell);
+        const road2 = new Road(intCell, road.to);
         return [road1, road2];
     }
 
@@ -221,17 +212,14 @@ class Board {
         for (let i = 0; i < this.roads.length; i++) {
             const road = this.roads[i];
             if (Math.abs(x - road.from.x) <= this.snapDistance && Math.abs(y - road.from.y) <= this.snapDistance) {
-                x = road.from.x;
-                y = road.from.y;
-                break;
+                return road.from;
             }
             if (Math.abs(x - road.to.x) <= this.snapDistance && Math.abs(y - road.to.y) <= this.snapDistance) {
-                x = road.to.x;
-                y = road.to.y;
-                break;
+                return road.to;
             }
         }
-        return { x: x, y: y };
+        // No cell found nearby
+        return new Cell(x, y);
     }
 
     public drawRoads(): void {
@@ -276,32 +264,14 @@ class Board {
         const options: Cell[] = [];
         const roads: Road[] = [];
         const same: Cell[] = [];
-        const original = JSON.stringify(cell);
 
         this.roads.forEach(road => {
-            if (JSON.stringify(road.from) === original) {
+            if (road.from.id === cell.id) {
                 same.push(road.from);
                 options.push(road.to);
                 roads.push(road);
             }
-            if (JSON.stringify(road.to) === original) {
-                same.push(road.to);
-                options.push(road.from);
-                roads.push(road);
-            }
-        });
-
-        // Get the nearest cell origin
-        // cell.x = cell.x - (cell.x % this.gridSize);
-        // cell.y = cell.y - (cell.y % this.gridSize);
-
-        this.roads.forEach(road => {
-            if (JSON.stringify(road.from) === JSON.stringify(cell)) {
-                same.push(road.from);
-                options.push(road.to);
-                roads.push(road);
-            }
-            if (JSON.stringify(road.to) === JSON.stringify(cell)) {
+            if (road.to.id === cell.id) {
                 same.push(road.to);
                 options.push(road.from);
                 roads.push(road);
@@ -311,16 +281,60 @@ class Board {
         return { roads: roads, same: same, options: options }
     }
 
+    removeDuplicates() {
+        const dups = [];
+        this.roads = this.roads.filter(function (el) {
+            // If it is not a duplicate, return true
+            if (dups.indexOf(el.id) == -1) {
+                dups.push(el.id);
+                return true;
+            }
+            return false;
+        });
+    }
+
 }
 
 class Cell {
-    public x: number;
-    public y: number;
+    public id: number;
+
+    constructor(public x: number, public y: number) {
+        this.id = this.hash(x, y);
+    }
+
+    public hash(x: number, y: number): number {
+        const seed = x.toString() + '-' + y.toString();
+        var hash = 0, i, chr;
+        if (seed.length === 0) return hash;
+        for (i = 0; i < seed.length; i++) {
+            chr = seed.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
+    }
 }
 
 class Road {
-    public from: Cell;
-    public to: Cell;
+    public id: number;
+
+    constructor(public from: Cell, public to: Cell) {
+        this.id = this.hash(from, to);
+    }
+
+    public hash(from: Cell, to: Cell): number {
+        const smaller = from.id < to.id ? from.id : to.id;
+        const bigger = from.id < to.id ? to.id : from.id;
+        const seed = smaller.toString() + '-' + bigger.toString();
+        var hash = 0, i, chr;
+        if (seed.length === 0) return hash;
+        for (i = 0; i < seed.length; i++) {
+            chr = seed.charCodeAt(i);
+            hash = ((hash << 5) - hash) + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
+    }
 }
 
 class Vehicle {
@@ -330,6 +344,7 @@ class Vehicle {
     public radius = 3;
     public speed = Math.random() * 8 + 2;
     public destination: Cell;
+    public atDestination = true;
     public direction: number;
     public style: string;
 
@@ -344,23 +359,23 @@ class Vehicle {
         const distX = this.destination.x - this.x;
         const distY = this.destination.y - this.y;
         this.direction = Math.atan2(distY, distX);
+        this.atDestination = false;
 
         return this.destination;
     }
 
     public move() {
         // Either move to the destination exactly or clear the destination
-        if (this.destination) {
+        if (this.destination && !this.atDestination) {
             const distX = this.destination.x - this.x;
             const distY = this.destination.y - this.y;
             if (Math.abs(distX) > this.speed + 2 || Math.abs(distY) > this.speed + 2) {
                 this.x += this.speed * Math.cos(this.direction);
                 this.y += this.speed * Math.sin(this.direction);
-            } else if (distX !== 0 && distY !== 0) {
+            } else {
                 this.x = this.destination.x;
                 this.y = this.destination.y;
-            } else {
-                this.destination = null;
+                this.atDestination = true;
             }
         }
     }
@@ -418,6 +433,7 @@ class Game {
         const newVehicle = new Vehicle();
         newVehicle.x = this.board.roads[0].from.x;
         newVehicle.y = this.board.roads[0].from.y;
+        newVehicle.destination = this.board.roads[0].from;
         this.vehicles.push(newVehicle);
     }
 
@@ -428,10 +444,10 @@ class Game {
             this.board.onHover(this.mouse.clientX, this.mouse.clientY);
         }
         this.vehicles.forEach(vehicle => {
-            if (vehicle.destination) {
+            if (!vehicle.atDestination) {
                 vehicle.move();
             } else {
-                const options = this.board.findRoadsWithCell({ x: vehicle.x, y: vehicle.y }).options;
+                const options = this.board.findRoadsWithCell(vehicle.destination).options;
                 vehicle.chooseDestination(options);
                 vehicle.move();
             }
@@ -444,5 +460,3 @@ class Game {
 }
 
 window.onload = function () { const game = new Game(); game.play(); };
-
-
