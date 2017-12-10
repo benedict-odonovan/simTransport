@@ -11,9 +11,10 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: 0, y: 0 };
         // Roads
         this.roads = [];
-        this.snapDistance = 20;
+        this.roadSnapDistance = 10;
         this.safetyDistance = 35;
         // Intersections
+        this.intSnapDistance = 20;
         this.intRadius = 10;
         // Styles
         this.gridColor = 'rgb(240,240,240)';
@@ -99,12 +100,36 @@ var Board = /** @class */ (function () {
             this.roadStart = null;
         }
     };
-    Board.prototype.createNewRoad = function (newR) {
-        var _this = this;
-        // Keep track of the places where the new road intercepts existing roads
-        var newRSplits = [];
-        var newRParts = [];
-        // Helper functions
+    Board.prototype.getDistancePointToRoad = function (point, road) {
+        function sqr(x) { return x * x; }
+        function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y); }
+        function distToSegment(point, from, to) {
+            var roadLength = dist2(from, to);
+            // If the road is just a point then return the point to point distance
+            if (roadLength == 0)
+                return { dist: Math.sqrt(dist2(point, from)), x: point.x, y: point.y };
+            // % of the way down the line
+            var t = ((point.x - from.x) * (to.x - from.x) + (point.y - from.y) * (to.y - from.y)) / roadLength;
+            t = Math.max(0, Math.min(1, t));
+            var intX = from.x + t * (to.x - from.x);
+            var intY = from.y + t * (to.y - from.y);
+            return {
+                dist: Math.sqrt(dist2(point, new Cell(intX, intY))),
+                x: intX,
+                y: intY
+            };
+        }
+        return distToSegment(point, road.from, road.to);
+    };
+    Board.prototype.getIntersection = function (road1, road2) {
+        var line1StartX = road1.from.x;
+        var line1StartY = road1.from.y;
+        var line1EndX = road1.to.x;
+        var line1EndY = road1.to.y;
+        var line2StartX = road2.from.x;
+        var line2StartY = road2.from.y;
+        var line2EndX = road2.to.x;
+        var line2EndY = road2.to.y;
         var slope = function (x1, y1, x2, y2) {
             if (x1 == x2)
                 return false;
@@ -125,48 +150,54 @@ var Board = /** @class */ (function () {
                 return x1;
             return (-1 * ((slope = slope(x1, y1, x2, y2)) * x1 - y1)) / slope;
         };
-        var getIntersection = function (line1StartX, line1StartY, line1EndX, line1EndY, line2StartX, line2StartY, line2EndX, line2EndY) {
-            // if the lines intersect, the result contains the x and y of the intersection (treating the lines as infinite) and booleans for whether line segment 1 or line segment 2 contain the point
-            var denominator, a, b, numerator1, numerator2, result = {
-                x: null,
-                y: null,
-                onLine1: false,
-                onLine2: false
-            };
-            denominator = ((line2EndY - line2StartY) * (line1EndX - line1StartX)) - ((line2EndX - line2StartX) * (line1EndY - line1StartY));
-            if (denominator == 0) {
-                return result;
-            }
-            a = line1StartY - line2StartY;
-            b = line1StartX - line2StartX;
-            numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
-            numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
-            a = numerator1 / denominator;
-            b = numerator2 / denominator;
-            // if we cast these lines infinitely in both directions, they intersect here:
-            result.x = Math.round(line1StartX + (a * (line1EndX - line1StartX)));
-            result.y = Math.round(line1StartY + (a * (line1EndY - line1StartY)));
-            /*
-                    // it is worth noting that this should be the same as:
-                    x = line2StartX + (b * (line2EndX - line2StartX));
-                    y = line2StartX + (b * (line2EndY - line2StartY));
-                    */
-            // if line1 is a segment and line2 is infinite, they intersect if:
-            if (a > 0 && a < 1) {
-                result.onLine1 = true;
-            }
-            // if line2 is a segment and line1 is infinite, they intersect if:
-            if (b > 0 && b < 1) {
-                result.onLine2 = true;
-            }
-            // if line1 and line2 are segments, they intersect if both of the above are true
-            return result;
+        // if the lines intersect, the result contains the x and y of the intersection (treating the lines as infinite) and booleans for whether line segment 1 or line segment 2 contain the point
+        var denominator, a, b, numerator1, numerator2, result = {
+            x: null,
+            y: null,
+            onLine1: false,
+            onLine2: false
         };
+        denominator = ((line2EndY - line2StartY) * (line1EndX - line1StartX)) - ((line2EndX - line2StartX) * (line1EndY - line1StartY));
+        if (denominator == 0) {
+            return result;
+        }
+        a = line1StartY - line2StartY;
+        b = line1StartX - line2StartX;
+        numerator1 = ((line2EndX - line2StartX) * a) - ((line2EndY - line2StartY) * b);
+        numerator2 = ((line1EndX - line1StartX) * a) - ((line1EndY - line1StartY) * b);
+        a = numerator1 / denominator;
+        b = numerator2 / denominator;
+        // if we cast these lines infinitely in both directions, they intersect here:
+        result.x = line1StartX + (a * (line1EndX - line1StartX));
+        result.y = line1StartY + (a * (line1EndY - line1StartY));
+        result.x = Math.round(result.x);
+        result.y = Math.round(result.y);
+        // if line1 is a segment and line2 is infinite, they intersect if:
+        var lengthLine1 = Math.sqrt(Math.pow(line1StartX - line1EndX, 2) + Math.pow(line1StartY - line1EndY, 2));
+        var marginOfErrorLine1 = this.intRadius / lengthLine1;
+        if (a > (0 - marginOfErrorLine1) && a < (1 + marginOfErrorLine1)) {
+            result.onLine1 = true;
+        }
+        // if line2 is a segment and line1 is infinite, they intersect if:
+        var lengthLine2 = Math.sqrt(Math.pow(line2StartX - line2EndX, 2) + Math.pow(line2StartY - line2EndY, 2));
+        var marginOfErrorLine2 = this.intRadius / lengthLine2;
+        if (b > (0 - marginOfErrorLine2) && b < (1 + marginOfErrorLine2)) {
+            result.onLine2 = true;
+        }
+        // if line1 and line2 are segments, they intersect if both of the above are true
+        return result;
+    };
+    Board.prototype.createNewRoad = function (newR) {
+        var _this = this;
+        // Keep track of the places where the new road intercepts existing roads
+        var newRSplits = [];
+        var newRParts = [];
         // For each intercept split the road intercepted into two
         this.roads.forEach(function (road) {
-            var intercept = getIntersection(road.from.x, road.from.y, road.to.x, road.to.y, newR.from.x, newR.from.y, newR.to.x, newR.to.y);
+            var intercept = _this.getIntersection(road, newR);
             if (intercept.onLine1 && intercept.onLine2) {
-                var intCell = new Cell(intercept.x, intercept.y);
+                var nearest = _this.autoConnect(intercept.x, intercept.y);
+                var intCell = new Cell(nearest.x, nearest.y);
                 var newRoad = new Road(intCell, road.to);
                 newRSplits.push(intCell);
                 _this.roads.push(newRoad);
@@ -185,7 +216,8 @@ var Board = /** @class */ (function () {
         });
         newRParts.push(newR);
         this.roads = this.roads.concat(newRParts);
-        this.removeDuplicates();
+        this.recalcRoadIds();
+        this.removeDupRoads();
     };
     Board.prototype.splitRoad = function (road, intCell) {
         var road1 = new Road(road.from, intCell);
@@ -193,14 +225,23 @@ var Board = /** @class */ (function () {
         return [road1, road2];
     };
     Board.prototype.autoConnect = function (x, y) {
-        // Autoconnect to existing roads
+        // Autoconnect to existing intersections
         for (var i = 0; i < this.roads.length; i++) {
             var road = this.roads[i];
-            if (Math.abs(x - road.from.x) <= this.snapDistance && Math.abs(y - road.from.y) <= this.snapDistance) {
+            if (Math.abs(x - road.from.x) <= this.intSnapDistance && Math.abs(y - road.from.y) <= this.intSnapDistance) {
                 return road.from;
             }
-            if (Math.abs(x - road.to.x) <= this.snapDistance && Math.abs(y - road.to.y) <= this.snapDistance) {
+            if (Math.abs(x - road.to.x) <= this.intSnapDistance && Math.abs(y - road.to.y) <= this.intSnapDistance) {
                 return road.to;
+            }
+        }
+        // Autoconnect to existing roads
+        var point = new Cell(x, y);
+        for (var i = 0; i < this.roads.length; i++) {
+            var road = this.roads[i];
+            var res = this.getDistancePointToRoad(point, road);
+            if (res.dist <= this.roadSnapDistance) {
+                return new Cell(res.x, res.y);
             }
         }
         // No cell found nearby
@@ -260,7 +301,7 @@ var Board = /** @class */ (function () {
         });
         return { roads: roads, same: same, options: options };
     };
-    Board.prototype.removeDuplicates = function () {
+    Board.prototype.removeDupRoads = function () {
         var dups = [];
         this.roads = this.roads.filter(function (el) {
             // If it is not a duplicate, return true
@@ -269,6 +310,11 @@ var Board = /** @class */ (function () {
                 return true;
             }
             return false;
+        });
+    };
+    Board.prototype.recalcRoadIds = function () {
+        this.roads.forEach(function (road) {
+            road.id = road.hash(road.from, road.to);
         });
     };
     return Board;
@@ -318,7 +364,8 @@ var Road = /** @class */ (function () {
 var Vehicle = /** @class */ (function () {
     function Vehicle() {
         this.radius = 3;
-        this.speed = Math.random() * 8 + 2;
+        // public speed = Math.random() * 8 + 2;
+        this.speed = 5;
         this.atDestination = true;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
