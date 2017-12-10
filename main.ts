@@ -267,7 +267,7 @@ class Board {
 
     public render(): void {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.drawGrid();
+        //this.drawGrid();
         this.drawRoads();
         this.drawIntersections();
     }
@@ -339,7 +339,6 @@ class Vehicle {
 
     public chooseDestination(options: Cell[]): Cell {
         this.destination = options[Math.ceil(Math.random() * options.length) - 1];
-        console.log('Moving to ', this.destination, ' from ', this.x, ' ', this.y);
 
         // Find how to get there
         const distX = this.destination.x - this.x;
@@ -361,7 +360,6 @@ class Vehicle {
                 this.x = this.destination.x;
                 this.y = this.destination.y;
             } else {
-                console.log('Clearing destination');
                 this.destination = null;
             }
         }

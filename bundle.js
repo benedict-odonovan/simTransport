@@ -12,6 +12,7 @@ var Board = /** @class */ (function () {
         // Roads
         this.roads = [];
         this.snapDistance = 20;
+        this.safetyDistance = 35;
         // Intersections
         this.intRadius = 10;
         // Styles
@@ -80,7 +81,7 @@ var Board = /** @class */ (function () {
         // Reset lastHovered for next time
         this.lastHovered = { x: x, y: y };
     };
-    Board.prototype.createNewRoad = function (x, y) {
+    Board.prototype.planNewRoad = function (x, y) {
         // Connect to nearest road
         var nearestRoadEnd = this.autoConnect(x, y);
         x = nearestRoadEnd.x;
@@ -101,12 +102,12 @@ var Board = /** @class */ (function () {
             }
             // No duplicates
             if (this.roads.every(function (road) { return JSON.stringify(road) !== JSON.stringify(newRoad_1); })) {
-                this.roadIntersect(newRoad_1);
+                this.createNewRoad(newRoad_1);
             }
             this.roadStart = null;
         }
     };
-    Board.prototype.roadIntersect = function (newR) {
+    Board.prototype.createNewRoad = function (newR) {
         var _this = this;
         // Keep track of the places where the new road intercepts existing roads
         var newRSplits = [];
@@ -180,7 +181,7 @@ var Board = /** @class */ (function () {
                 road.to = intCell;
             }
         });
-        // Split the new road in order to keep things simple
+        // Sort the new road in order to keep things simple when splitting
         newRSplits.sort(function (a, b) {
             return (a.x + a.y) - (b.x + b.y);
         });
@@ -247,7 +248,7 @@ var Board = /** @class */ (function () {
     };
     Board.prototype.render = function () {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.drawGrid();
+        //this.drawGrid();
         this.drawRoads();
         this.drawIntersections();
     };
@@ -305,7 +306,6 @@ var Vehicle = /** @class */ (function () {
     }
     Vehicle.prototype.chooseDestination = function (options) {
         this.destination = options[Math.ceil(Math.random() * options.length) - 1];
-        console.log('Moving to ', this.destination, ' from ', this.x, ' ', this.y);
         // Find how to get there
         var distX = this.destination.x - this.x;
         var distY = this.destination.y - this.y;
@@ -326,7 +326,6 @@ var Vehicle = /** @class */ (function () {
                 this.y = this.destination.y;
             }
             else {
-                console.log('Clearing destination');
                 this.destination = null;
             }
         }
@@ -380,7 +379,7 @@ var Game = /** @class */ (function () {
             var x = event.clientX;
             var y = event.clientY;
             _this.numClicks++;
-            _this.board.createNewRoad(x, y);
+            _this.board.planNewRoad(x, y);
             if (_this.board.roads.length > 0 && _this.numClicks % 2 === 0) {
                 _this.addVehicle();
             }
