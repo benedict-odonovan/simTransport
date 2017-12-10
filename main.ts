@@ -10,11 +10,10 @@ class Board {
     // Roads
     public roads: Road[] = [];
     public roadStart: Cell;
-    public roadSnapDistance = 10;
-    public safetyDistance = 35;
+    public roadSnapDistance = 20;
 
     // Intersections
-    public intSnapDistance = 20;
+    public intSnapDistance = 30;
     public intRadius = 10;
 
     // Styles
@@ -30,6 +29,7 @@ class Board {
         this.initGrid();
     }
 
+    // Grid creation
     public initGrid() {
         this.cells = [];
         let i = 0;
@@ -45,54 +45,7 @@ class Board {
         this.drawGrid();
     }
 
-    public drawGrid() {
-        this.cells.forEach(row => {
-            row.forEach(cell => {
-                this.ctx.beginPath();
-                this.ctx.lineWidth = 1;
-                this.ctx.strokeStyle = this.gridColor;
-                this.ctx.strokeRect(cell.x, cell.y, this.gridSize - 1, this.gridSize - 1);
-            });
-        });
-    }
-
-    public onHover(x: number, y: number): void {
-        // Remove the hover effect from the last cell hovered over
-        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
-
-        // Draw the hover effect for this cell
-        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.hoverColor;
-        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
-
-        // If drawing a road then show how it will look
-        if (this.roadStart) {
-            this.ctx.beginPath();
-            this.ctx.strokeStyle = this.pendingRoadColor;
-            this.ctx.lineWidth = this.roadWidth;
-            this.ctx.lineCap = 'round';
-
-            // Connect to nearest road
-            const nearestRoadEnd = this.autoConnect(x, y);
-            x = nearestRoadEnd.x;
-            y = nearestRoadEnd.y;
-
-            this.ctx.moveTo(this.roadStart.x, this.roadStart.y);
-            this.ctx.lineTo(x, y);
-            this.ctx.stroke();
-            this.ctx.lineWidth = 1;
-        }
-
-        // Reset lastHovered for next time
-        this.lastHovered = { x: x, y: y };
-    }
-
+    // Road Creation
     public planNewRoad(x: number, y: number): void {
         // Connect to nearest road
         const nearestRoadEnd = this.autoConnect(x, y);
@@ -246,7 +199,7 @@ class Board {
         this.removeDupRoads();
     }
 
-    splitRoad(road: Road, intCell: Cell): Road[] {
+    public splitRoad(road: Road, intCell: Cell): Road[] {
         const road1 = new Road(road.from, intCell);
         const road2 = new Road(intCell, road.to);
         return [road1, road2];
@@ -278,6 +231,46 @@ class Board {
         return new Cell(x, y);
     }
 
+    public findRoadsWithCell(cell: Cell): { roads: Road[], same: Cell[], options: Cell[] } {
+        const options: Cell[] = [];
+        const roads: Road[] = [];
+        const same: Cell[] = [];
+
+        this.roads.forEach(road => {
+            if (road.from.id === cell.id) {
+                same.push(road.from);
+                options.push(road.to);
+                roads.push(road);
+            }
+            if (road.to.id === cell.id) {
+                same.push(road.to);
+                options.push(road.from);
+                roads.push(road);
+            }
+        });
+
+        return { roads: roads, same: same, options: options }
+    }
+
+    public removeDupRoads() {
+        const dups = [];
+        this.roads = this.roads.filter(function (el) {
+            // If it is not a duplicate, return true
+            if (dups.indexOf(el.id) == -1) {
+                dups.push(el.id);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    public recalcRoadIds() {
+        this.roads.forEach(road => {
+            road.id = road.hash(road.from, road.to);
+        });
+    }
+
+    // Rendering
     public drawRoads(): void {
         this.roads.forEach(road => {
             this.ctx.beginPath();
@@ -304,6 +297,54 @@ class Board {
         })
     }
 
+    public drawGrid() {
+        this.cells.forEach(row => {
+            row.forEach(cell => {
+                this.ctx.beginPath();
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeStyle = this.gridColor;
+                this.ctx.strokeRect(cell.x, cell.y, this.gridSize - 1, this.gridSize - 1);
+            });
+        });
+    }
+
+    public onHover(x: number, y: number): void {
+        // Remove the hover effect from the last cell hovered over
+        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = this.gridColor;
+        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
+
+        // Draw the hover effect for this cell
+        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = this.hoverColor;
+        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
+
+        // If drawing a road then show how it will look
+        if (this.roadStart) {
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = this.pendingRoadColor;
+            this.ctx.lineWidth = this.roadWidth;
+            this.ctx.lineCap = 'round';
+
+            // Connect to nearest road
+            const nearestRoadEnd = this.autoConnect(x, y);
+            x = nearestRoadEnd.x;
+            y = nearestRoadEnd.y;
+
+            this.ctx.moveTo(this.roadStart.x, this.roadStart.y);
+            this.ctx.lineTo(x, y);
+            this.ctx.stroke();
+            this.ctx.lineWidth = 1;
+        }
+
+        // Reset lastHovered for next time
+        this.lastHovered = { x: x, y: y };
+    }
+
     public fillPageWithCanvas(): void {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
@@ -314,45 +355,6 @@ class Board {
         //this.drawGrid();
         this.drawRoads();
         this.drawIntersections();
-    }
-
-    findRoadsWithCell(cell: Cell): { roads: Road[], same: Cell[], options: Cell[] } {
-        const options: Cell[] = [];
-        const roads: Road[] = [];
-        const same: Cell[] = [];
-
-        this.roads.forEach(road => {
-            if (road.from.id === cell.id) {
-                same.push(road.from);
-                options.push(road.to);
-                roads.push(road);
-            }
-            if (road.to.id === cell.id) {
-                same.push(road.to);
-                options.push(road.from);
-                roads.push(road);
-            }
-        });
-
-        return { roads: roads, same: same, options: options }
-    }
-
-    removeDupRoads() {
-        const dups = [];
-        this.roads = this.roads.filter(function (el) {
-            // If it is not a duplicate, return true
-            if (dups.indexOf(el.id) == -1) {
-                dups.push(el.id);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    recalcRoadIds() {
-        this.roads.forEach(road => {
-            road.id = road.hash(road.from, road.to);
-        });
     }
 
 }
@@ -406,8 +408,8 @@ class Vehicle {
     public radius = 3;
     // public speed = Math.random() * 8 + 2;
     public speed = 5;
-    public destination: Cell;
-    public atDestination = true;
+    public destinations: Cell[];
+    public currentCell: Cell;
     public direction: number;
     public style: string;
 
@@ -415,30 +417,27 @@ class Vehicle {
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
 
-    public chooseDestination(options: Cell[]): Cell {
-        this.destination = options[Math.ceil(Math.random() * options.length) - 1];
-
-        // Find how to get there
-        const distX = this.destination.x - this.x;
-        const distY = this.destination.y - this.y;
-        this.direction = Math.atan2(distY, distX);
-        this.atDestination = false;
-
-        return this.destination;
+    public chooseFinalDestination(options: Cell[]): Cell {
+        this.destinations = [];
+        const chosenOption = options[Math.ceil(Math.random() * options.length) - 1];
+        this.destinations.push(chosenOption);
+        return this.destinations[0];
     }
 
     public move() {
         // Either move to the destination exactly or clear the destination
-        if (this.destination && !this.atDestination) {
-            const distX = this.destination.x - this.x;
-            const distY = this.destination.y - this.y;
+        if (this.destinations.length > 0) {
+            const distX = this.destinations[0].x - this.x;
+            const distY = this.destinations[0].y - this.y;
+            this.direction = Math.atan2(distY, distX);
             if (Math.abs(distX) > this.speed + 2 || Math.abs(distY) > this.speed + 2) {
                 this.x += this.speed * Math.cos(this.direction);
                 this.y += this.speed * Math.sin(this.direction);
             } else {
-                this.x = this.destination.x;
-                this.y = this.destination.y;
-                this.atDestination = true;
+                this.x = this.destinations[0].x;
+                this.y = this.destinations[0].y;
+                this.currentCell = this.destinations[0];
+                this.destinations.splice(0, 1);
             }
         }
     }
@@ -496,7 +495,7 @@ class Game {
         const newVehicle = new Vehicle();
         newVehicle.x = this.board.roads[0].from.x;
         newVehicle.y = this.board.roads[0].from.y;
-        newVehicle.destination = this.board.roads[0].from;
+        newVehicle.destinations = [this.board.roads[0].to];
         this.vehicles.push(newVehicle);
     }
 
@@ -507,11 +506,11 @@ class Game {
             this.board.onHover(this.mouse.clientX, this.mouse.clientY);
         }
         this.vehicles.forEach(vehicle => {
-            if (!vehicle.atDestination) {
+            if (vehicle.destinations.length > 0) {
                 vehicle.move();
             } else {
-                const options = this.board.findRoadsWithCell(vehicle.destination).options;
-                vehicle.chooseDestination(options);
+                const options = this.board.findRoadsWithCell(vehicle.currentCell).options;
+                vehicle.chooseFinalDestination(options);
                 vehicle.move();
             }
             vehicle.render(this.ctx);

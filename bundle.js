@@ -11,10 +11,9 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: 0, y: 0 };
         // Roads
         this.roads = [];
-        this.roadSnapDistance = 10;
-        this.safetyDistance = 35;
+        this.roadSnapDistance = 20;
         // Intersections
-        this.intSnapDistance = 20;
+        this.intSnapDistance = 30;
         this.intRadius = 10;
         // Styles
         this.gridColor = 'rgb(240,240,240)';
@@ -26,6 +25,7 @@ var Board = /** @class */ (function () {
         this.fillPageWithCanvas();
         this.initGrid();
     }
+    // Grid creation
     Board.prototype.initGrid = function () {
         this.cells = [];
         var i = 0;
@@ -40,48 +40,7 @@ var Board = /** @class */ (function () {
         }
         this.drawGrid();
     };
-    Board.prototype.drawGrid = function () {
-        var _this = this;
-        this.cells.forEach(function (row) {
-            row.forEach(function (cell) {
-                _this.ctx.beginPath();
-                _this.ctx.lineWidth = 1;
-                _this.ctx.strokeStyle = _this.gridColor;
-                _this.ctx.strokeRect(cell.x, cell.y, _this.gridSize - 1, _this.gridSize - 1);
-            });
-        });
-    };
-    Board.prototype.onHover = function (x, y) {
-        // Remove the hover effect from the last cell hovered over
-        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
-        // Draw the hover effect for this cell
-        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.hoverColor;
-        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
-        // If drawing a road then show how it will look
-        if (this.roadStart) {
-            this.ctx.beginPath();
-            this.ctx.strokeStyle = this.pendingRoadColor;
-            this.ctx.lineWidth = this.roadWidth;
-            this.ctx.lineCap = 'round';
-            // Connect to nearest road
-            var nearestRoadEnd = this.autoConnect(x, y);
-            x = nearestRoadEnd.x;
-            y = nearestRoadEnd.y;
-            this.ctx.moveTo(this.roadStart.x, this.roadStart.y);
-            this.ctx.lineTo(x, y);
-            this.ctx.stroke();
-            this.ctx.lineWidth = 1;
-        }
-        // Reset lastHovered for next time
-        this.lastHovered = { x: x, y: y };
-    };
+    // Road Creation
     Board.prototype.planNewRoad = function (x, y) {
         // Connect to nearest road
         var nearestRoadEnd = this.autoConnect(x, y);
@@ -247,42 +206,6 @@ var Board = /** @class */ (function () {
         // No cell found nearby
         return new Cell(x, y);
     };
-    Board.prototype.drawRoads = function () {
-        var _this = this;
-        this.roads.forEach(function (road) {
-            _this.ctx.beginPath();
-            _this.ctx.strokeStyle = _this.roadColor;
-            _this.ctx.lineWidth = _this.roadWidth;
-            _this.ctx.lineCap = 'round';
-            _this.ctx.moveTo(road.from.x, road.from.y);
-            _this.ctx.lineTo(road.to.x, road.to.y);
-            _this.ctx.stroke();
-        });
-        this.drawIntersections();
-    };
-    Board.prototype.drawIntersections = function () {
-        var _this = this;
-        var intersections = [];
-        this.roads.forEach(function (road) {
-            intersections = intersections.concat([road.from, road.to]);
-        });
-        intersections.forEach(function (intersection) {
-            _this.ctx.beginPath();
-            _this.ctx.fillStyle = _this.intersectionColor;
-            _this.ctx.arc(intersection.x, intersection.y, _this.intRadius, 0, 2 * Math.PI, false);
-            _this.ctx.fill();
-        });
-    };
-    Board.prototype.fillPageWithCanvas = function () {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-    };
-    Board.prototype.render = function () {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        //this.drawGrid();
-        this.drawRoads();
-        this.drawIntersections();
-    };
     Board.prototype.findRoadsWithCell = function (cell) {
         var options = [];
         var roads = [];
@@ -316,6 +239,85 @@ var Board = /** @class */ (function () {
         this.roads.forEach(function (road) {
             road.id = road.hash(road.from, road.to);
         });
+    };
+    // Rendering
+    Board.prototype.drawRoads = function () {
+        var _this = this;
+        this.roads.forEach(function (road) {
+            _this.ctx.beginPath();
+            _this.ctx.strokeStyle = _this.roadColor;
+            _this.ctx.lineWidth = _this.roadWidth;
+            _this.ctx.lineCap = 'round';
+            _this.ctx.moveTo(road.from.x, road.from.y);
+            _this.ctx.lineTo(road.to.x, road.to.y);
+            _this.ctx.stroke();
+        });
+        this.drawIntersections();
+    };
+    Board.prototype.drawIntersections = function () {
+        var _this = this;
+        var intersections = [];
+        this.roads.forEach(function (road) {
+            intersections = intersections.concat([road.from, road.to]);
+        });
+        intersections.forEach(function (intersection) {
+            _this.ctx.beginPath();
+            _this.ctx.fillStyle = _this.intersectionColor;
+            _this.ctx.arc(intersection.x, intersection.y, _this.intRadius, 0, 2 * Math.PI, false);
+            _this.ctx.fill();
+        });
+    };
+    Board.prototype.drawGrid = function () {
+        var _this = this;
+        this.cells.forEach(function (row) {
+            row.forEach(function (cell) {
+                _this.ctx.beginPath();
+                _this.ctx.lineWidth = 1;
+                _this.ctx.strokeStyle = _this.gridColor;
+                _this.ctx.strokeRect(cell.x, cell.y, _this.gridSize - 1, _this.gridSize - 1);
+            });
+        });
+    };
+    Board.prototype.onHover = function (x, y) {
+        // Remove the hover effect from the last cell hovered over
+        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = this.gridColor;
+        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
+        // Draw the hover effect for this cell
+        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
+        this.ctx.beginPath();
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = this.hoverColor;
+        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
+        // If drawing a road then show how it will look
+        if (this.roadStart) {
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = this.pendingRoadColor;
+            this.ctx.lineWidth = this.roadWidth;
+            this.ctx.lineCap = 'round';
+            // Connect to nearest road
+            var nearestRoadEnd = this.autoConnect(x, y);
+            x = nearestRoadEnd.x;
+            y = nearestRoadEnd.y;
+            this.ctx.moveTo(this.roadStart.x, this.roadStart.y);
+            this.ctx.lineTo(x, y);
+            this.ctx.stroke();
+            this.ctx.lineWidth = 1;
+        }
+        // Reset lastHovered for next time
+        this.lastHovered = { x: x, y: y };
+    };
+    Board.prototype.fillPageWithCanvas = function () {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    };
+    Board.prototype.render = function () {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        //this.drawGrid();
+        this.drawRoads();
+        this.drawIntersections();
     };
     return Board;
 }());
@@ -366,31 +368,29 @@ var Vehicle = /** @class */ (function () {
         this.radius = 3;
         // public speed = Math.random() * 8 + 2;
         this.speed = 5;
-        this.atDestination = true;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
-    Vehicle.prototype.chooseDestination = function (options) {
-        this.destination = options[Math.ceil(Math.random() * options.length) - 1];
-        // Find how to get there
-        var distX = this.destination.x - this.x;
-        var distY = this.destination.y - this.y;
-        this.direction = Math.atan2(distY, distX);
-        this.atDestination = false;
-        return this.destination;
+    Vehicle.prototype.chooseFinalDestination = function (options) {
+        this.destinations = [];
+        var chosenOption = options[Math.ceil(Math.random() * options.length) - 1];
+        this.destinations.push(chosenOption);
+        return this.destinations[0];
     };
     Vehicle.prototype.move = function () {
         // Either move to the destination exactly or clear the destination
-        if (this.destination && !this.atDestination) {
-            var distX = this.destination.x - this.x;
-            var distY = this.destination.y - this.y;
+        if (this.destinations.length > 0) {
+            var distX = this.destinations[0].x - this.x;
+            var distY = this.destinations[0].y - this.y;
+            this.direction = Math.atan2(distY, distX);
             if (Math.abs(distX) > this.speed + 2 || Math.abs(distY) > this.speed + 2) {
                 this.x += this.speed * Math.cos(this.direction);
                 this.y += this.speed * Math.sin(this.direction);
             }
             else {
-                this.x = this.destination.x;
-                this.y = this.destination.y;
-                this.atDestination = true;
+                this.x = this.destinations[0].x;
+                this.y = this.destinations[0].y;
+                this.currentCell = this.destinations[0];
+                this.destinations.splice(0, 1);
             }
         }
     };
@@ -414,12 +414,12 @@ var Game = /** @class */ (function () {
                 _this.board.onHover(_this.mouse.clientX, _this.mouse.clientY);
             }
             _this.vehicles.forEach(function (vehicle) {
-                if (!vehicle.atDestination) {
+                if (vehicle.destinations.length > 0) {
                     vehicle.move();
                 }
                 else {
-                    var options = _this.board.findRoadsWithCell(vehicle.destination).options;
-                    vehicle.chooseDestination(options);
+                    var options = _this.board.findRoadsWithCell(vehicle.currentCell).options;
+                    vehicle.chooseFinalDestination(options);
                     vehicle.move();
                 }
                 vehicle.render(_this.ctx);
@@ -453,7 +453,7 @@ var Game = /** @class */ (function () {
         var newVehicle = new Vehicle();
         newVehicle.x = this.board.roads[0].from.x;
         newVehicle.y = this.board.roads[0].from.y;
-        newVehicle.destination = this.board.roads[0].from;
+        newVehicle.destinations = [this.board.roads[0].to];
         this.vehicles.push(newVehicle);
     };
     return Game;
