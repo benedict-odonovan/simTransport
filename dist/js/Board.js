@@ -11,14 +11,14 @@ var Board = /** @class */ (function () {
         // Roads
         this.roads = [];
         this.roadSnapDistance = 20;
+        this.roadWidth = 10;
         // Intersections
+        this.intersections = [];
         this.intSnapDistance = 30;
         this.intRadius = 10;
         // Styles
         this.gridColor = 'rgb(240,240,240)';
         this.hoverColor = 'rgb(0,0,0)';
-        this.roadColor = 'rgba(0,0,0,0.5)';
-        this.roadWidth = 10;
         this.pendingRoadColor = 'rgba(0,0,0,0.2)';
         this.intersectionColor = 'rgb(0,120,120)';
         this.fillPageWithCanvas();
@@ -150,7 +150,7 @@ var Board = /** @class */ (function () {
         // Keep track of the places where the new road intercepts existing roads
         var newRSplits = [];
         var newRParts = [];
-        // For each intercept split the road intercepted into two
+        // For each intercept, split the road intercepted into two
         this.roads.forEach(function (road) {
             var intercept = _this.getIntersection(road, newR);
             if (intercept.onLine1 && intercept.onLine2) {
@@ -162,10 +162,8 @@ var Board = /** @class */ (function () {
                 road.to = intCell;
             }
         });
-        // Sort the new road in order to keep things simple when splitting
-        newRSplits.sort(function (a, b) {
-            return (b.x + b.y) - (a.x + a.y);
-        });
+        // Sort the new road in order of distance from start of new road to prevent overlap
+        newRSplits.sort(function (a, b) { return b.distToCell(newR.from) - a.distToCell(newR.from); });
         newRSplits.forEach(function (split) {
             var road1 = _this.splitRoad(newR, split)[0];
             var road2 = _this.splitRoad(newR, split)[1];
@@ -176,6 +174,7 @@ var Board = /** @class */ (function () {
         this.roads = this.roads.concat(newRParts);
         this.recalcRoadIds();
         this.removeDupRoads();
+        this.removeDupIntersections();
     };
     Board.prototype.splitRoad = function (road, intCell) {
         var road1 = new Cells_1.Road(road.from, intCell);
@@ -226,7 +225,28 @@ var Board = /** @class */ (function () {
     Board.prototype.removeDupRoads = function () {
         var dups = [];
         this.roads = this.roads.filter(function (el) {
-            // If it is not a duplicate, return true
+            if (dups.indexOf(el.id) == -1) {
+                dups.push(el.id);
+                return true;
+            }
+            return false;
+        });
+        // Remove roads that don't go anywhere
+        this.roads = this.roads.filter(function (el) { return el.length() !== 0; });
+    };
+    Board.prototype.recalcRoadIds = function () {
+        this.roads.forEach(function (road) {
+            road.id = road.hash(road.from, road.to);
+        });
+    };
+    Board.prototype.removeDupIntersections = function () {
+        var _this = this;
+        this.roads.forEach(function (road) {
+            _this.intersections = _this.intersections.concat([road.from, road.to]);
+        });
+        // Remove duplicate intersections
+        var dups = [];
+        this.intersections = this.intersections.filter(function (el) {
             if (dups.indexOf(el.id) == -1) {
                 dups.push(el.id);
                 return true;
@@ -234,36 +254,26 @@ var Board = /** @class */ (function () {
             return false;
         });
     };
-    Board.prototype.recalcRoadIds = function () {
-        this.roads.forEach(function (road) {
-            road.id = road.hash(road.from, road.to);
-        });
-    };
     // Rendering
     Board.prototype.drawRoads = function () {
         var _this = this;
         this.roads.forEach(function (road) {
-            _this.ctx.beginPath();
-            _this.ctx.strokeStyle = _this.roadColor;
-            _this.ctx.lineWidth = _this.roadWidth;
-            _this.ctx.lineCap = 'round';
-            _this.ctx.moveTo(road.from.x, road.from.y);
-            _this.ctx.lineTo(road.to.x, road.to.y);
-            _this.ctx.stroke();
+            road.render(_this.ctx);
         });
         this.drawIntersections();
     };
     Board.prototype.drawIntersections = function () {
         var _this = this;
-        var intersections = [];
-        this.roads.forEach(function (road) {
-            intersections = intersections.concat([road.from, road.to]);
-        });
-        intersections.forEach(function (intersection) {
+        this.intersections.forEach(function (intersection) {
             _this.ctx.beginPath();
             _this.ctx.fillStyle = _this.intersectionColor;
             _this.ctx.arc(intersection.x, intersection.y, _this.intRadius, 0, 2 * Math.PI, false);
             _this.ctx.fill();
+            // this.ctx.beginPath();
+            // this.ctx.font = "14px Arial";
+            // this.ctx.fillStyle = "rgb(100,255,0)";
+            // this.ctx.fillText(intersection.id.toString(), intersection.x, intersection.y);
+            // this.ctx.fill();
         });
     };
     Board.prototype.drawGrid = function () {

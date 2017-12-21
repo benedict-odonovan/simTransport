@@ -1,5 +1,7 @@
 export class Road {
     public id: number;
+    public style = 'rgba(0,0,0,0.5)';
+    public roadWidth = 10;
 
     constructor(public from: Cell, public to: Cell) {
         this.id = this.hash(from, to);
@@ -18,12 +20,41 @@ export class Road {
         }
         return hash;
     }
+
+    public halfway(): Cell {
+        const hX = (this.from.x + this.to.x) / 2;
+        const hY = (this.from.y + this.to.y) / 2;
+        return new Cell(hX, hY);
+    }
+
+    public length(): number {
+        return this.to.distToCell(this.from);
+    }
+
+    public render(ctx: CanvasRenderingContext2D): void {
+        ctx.beginPath();
+        ctx.strokeStyle = this.style;
+        ctx.lineWidth = this.roadWidth;
+        ctx.lineCap = 'round';
+        ctx.moveTo(this.from.x, this.from.y);
+        ctx.lineTo(this.to.x, this.to.y);
+        ctx.stroke();
+
+        // ctx.beginPath();
+        // ctx.font = "14px Arial";
+        // ctx.fillStyle = "rgb(0,100,255)";
+        // const halfway = this.halfway();
+        // ctx.fillText(this.id.toString(), halfway.x, halfway.y);
+        // ctx.fill();
+    }
 }
 
 export class Cell {
     public id: number;
 
     constructor(public x: number, public y: number) {
+        x = Math.round(x);
+        y = Math.round(y);
         this.id = this.hash(x, y);
     }
 
@@ -37,5 +68,9 @@ export class Cell {
             hash |= 0; // Convert to 32bit integer
         }
         return hash;
+    }
+
+    public distToCell(b: Cell): number {
+        return Math.abs(this.x - b.x) + Math.abs(this.y - b.y);
     }
 }

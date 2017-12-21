@@ -11,16 +11,16 @@ export class Board {
     public roads: Road[] = [];
     public roadStart: Cell;
     public roadSnapDistance = 20;
+    public roadWidth = 10;
 
     // Intersections
+    public intersections: Cell[] = [];
     public intSnapDistance = 30;
     public intRadius = 10;
 
     // Styles
     public gridColor = 'rgb(240,240,240)';
     public hoverColor = 'rgb(0,0,0)';
-    public roadColor = 'rgba(0,0,0,0.5)';
-    public roadWidth = 10;
     public pendingRoadColor = 'rgba(0,0,0,0.2)';
     public intersectionColor = 'rgb(0,120,120)';
 
@@ -168,7 +168,7 @@ export class Board {
         const newRSplits: Cell[] = [];
         const newRParts: Road[] = [];
 
-        // For each intercept split the road intercepted into two
+        // For each intercept, split the road intercepted into two
         this.roads.forEach(road => {
             const intercept = this.getIntersection(road, newR);
             if (intercept.onLine1 && intercept.onLine2) {
@@ -181,10 +181,8 @@ export class Board {
             }
         });
 
-        // Sort the new road in order to keep things simple when splitting
-        newRSplits.sort((a, b) => {
-            return (b.x + b.y) - (a.x + a.y)
-        });
+        // Sort the new road in order of distance from start of new road to prevent overlap
+        newRSplits.sort((a, b) => b.distToCell(newR.from) - a.distToCell(newR.from));
 
         newRSplits.forEach(split => {
             const road1 = this.splitRoad(newR, split)[0];
@@ -197,6 +195,7 @@ export class Board {
         this.roads = this.roads.concat(newRParts);
         this.recalcRoadIds();
         this.removeDupRoads();
+        this.removeDupIntersections();
     }
 
     public splitRoad(road: Road, intCell: Cell): Road[] {
@@ -255,13 +254,15 @@ export class Board {
     public removeDupRoads() {
         const dups = [];
         this.roads = this.roads.filter(function (el) {
-            // If it is not a duplicate, return true
             if (dups.indexOf(el.id) == -1) {
                 dups.push(el.id);
                 return true;
             }
             return false;
         });
+
+        // Remove roads that don't go anywhere
+        this.roads = this.roads.filter(el => el.length() !== 0);
     }
 
     public recalcRoadIds() {
@@ -270,30 +271,42 @@ export class Board {
         });
     }
 
+    public removeDupIntersections(): void {
+        this.roads.forEach(road => {
+            this.intersections = this.intersections.concat([road.from, road.to]);
+        });
+
+        // Remove duplicate intersections
+        const dups = [];
+        this.intersections = this.intersections.filter(function (el) {
+            if (dups.indexOf(el.id) == -1) {
+                dups.push(el.id);
+                return true;
+            }
+            return false;
+        });
+    }
+
     // Rendering
     public drawRoads(): void {
         this.roads.forEach(road => {
-            this.ctx.beginPath();
-            this.ctx.strokeStyle = this.roadColor;
-            this.ctx.lineWidth = this.roadWidth;
-            this.ctx.lineCap = 'round';
-            this.ctx.moveTo(road.from.x, road.from.y);
-            this.ctx.lineTo(road.to.x, road.to.y);
-            this.ctx.stroke();
+            road.render(this.ctx);
         });
         this.drawIntersections();
     }
 
     public drawIntersections(): void {
-        let intersections: Cell[] = [];
-        this.roads.forEach(road => {
-            intersections = intersections.concat([road.from, road.to]);
-        })
-        intersections.forEach(intersection => {
+        this.intersections.forEach(intersection => {
             this.ctx.beginPath();
             this.ctx.fillStyle = this.intersectionColor;
             this.ctx.arc(intersection.x, intersection.y, this.intRadius, 0, 2 * Math.PI, false);
             this.ctx.fill();
+
+            // this.ctx.beginPath();
+            // this.ctx.font = "14px Arial";
+            // this.ctx.fillStyle = "rgb(100,255,0)";
+            // this.ctx.fillText(intersection.id.toString(), intersection.x, intersection.y);
+            // this.ctx.fill();
         })
     }
 
