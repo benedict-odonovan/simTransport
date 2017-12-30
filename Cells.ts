@@ -31,6 +31,14 @@ export class Road {
         return this.to.distToCell(this.from);
     }
 
+    public contains(cell: Cell): boolean {
+        return this.from.id === cell.id || this.to.id === cell.id;
+    }
+
+    public joins(b: Road): boolean {
+        return this.contains(b.from) || this.contains(b.to);
+    }
+
     public render(ctx: CanvasRenderingContext2D): void {
         ctx.beginPath();
         ctx.strokeStyle = this.style;
@@ -51,10 +59,11 @@ export class Road {
 
 export class Cell {
     public id: number;
+    public groupNum: number;
 
     constructor(public x: number, public y: number) {
-        x = Math.round(x);
-        y = Math.round(y);
+        this.x = Math.round(x);
+        this.y = Math.round(y);
         this.id = this.hash(x, y);
     }
 

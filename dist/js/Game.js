@@ -11,7 +11,8 @@ var Game = /** @class */ (function () {
             requestAnimationFrame(_this.play);
             _this.board.render();
             if (_this.mouse) {
-                _this.board.onHover(_this.mouse.clientX, _this.mouse.clientY);
+                var rect = _this.canvas.getBoundingClientRect();
+                _this.board.onHover(_this.mouse.clientX - rect.left, _this.mouse.clientY - rect.top);
             }
             _this.vehicles.forEach(function (vehicle) {
                 vehicle.move();
@@ -33,8 +34,9 @@ var Game = /** @class */ (function () {
             .distinctUntilChanged()
             .subscribe(function (e) {
             var event = e;
-            var x = event.clientX;
-            var y = event.clientY;
+            var rect = _this.canvas.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
             _this.numClicks++;
             _this.board.planNewRoad(x, y);
             if (_this.board.roads.length > 0 && _this.numClicks % 2 === 0) {

@@ -17,6 +17,7 @@ export class Board {
     public intersections: Cell[] = [];
     public intSnapDistance = 30;
     public intRadius = 10;
+    public connectedInts: Cell[][] = [];
 
     // Styles
     public gridColor = 'rgb(240,240,240)';
@@ -26,7 +27,7 @@ export class Board {
 
     constructor(public canvas: HTMLCanvasElement, public ctx: CanvasRenderingContext2D) {
         this.fillPageWithCanvas();
-        this.initGrid();
+        //this.initGrid();
     }
 
     // Grid creation
@@ -66,7 +67,7 @@ export class Board {
         }
     }
 
-    public getDistancePointToRoad(point: Cell, road: Road): { dist: number, x: number, y: number } {
+    public getPointToRoadDist(point: Cell, road: Road): { dist: number, x: number, y: number } {
 
         function sqr(x) { return x * x }
         function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y) }
@@ -196,6 +197,7 @@ export class Board {
         this.recalcRoadIds();
         this.removeDupRoads();
         this.removeDupIntersections();
+        this.groupConnectedRoads();
     }
 
     public splitRoad(road: Road, intCell: Cell): Road[] {
@@ -220,7 +222,7 @@ export class Board {
         const point = new Cell(x, y);
         for (let i = 0; i < this.roads.length; i++) {
             const road = this.roads[i];
-            const res = this.getDistancePointToRoad(point, road);
+            const res = this.getPointToRoadDist(point, road);
             if (res.dist <= this.roadSnapDistance) {
                 return new Cell(res.x, res.y);
             }
@@ -251,6 +253,20 @@ export class Board {
         return { roads: roads, same: same, options: options }
     }
 
+    public findCellsInGroup(cell: Cell): Cell[] {
+        if (cell.groupNum) {
+            return this.connectedInts[cell.groupNum].filter(el => el.id !== cell.id);
+        }
+        else {
+            for (let i = 0; i < this.connectedInts.length; i++) {
+                const group = this.connectedInts[i];
+                if (group.map(el => el.id).indexOf(cell.id) > -1) {
+                    return group.filter(el => el.id !== cell.id);
+                }
+            }
+        }
+    }
+
     public removeDupRoads() {
         const dups = [];
         this.roads = this.roads.filter(function (el) {
@@ -263,12 +279,6 @@ export class Board {
 
         // Remove roads that don't go anywhere
         this.roads = this.roads.filter(el => el.length() !== 0);
-    }
-
-    public recalcRoadIds() {
-        this.roads.forEach(road => {
-            road.id = road.hash(road.from, road.to);
-        });
     }
 
     public removeDupIntersections(): void {
@@ -284,6 +294,50 @@ export class Board {
                 return true;
             }
             return false;
+        });
+    }
+
+    public recalcRoadIds() {
+        this.roads.forEach(road => {
+            road.id = road.hash(road.from, road.to);
+        });
+    }
+
+    public groupConnectedRoads(): void {
+        let ungroupedRoads: Road[] = JSON.parse(JSON.stringify(this.roads));
+        const groups: Road[][] = [];
+        while (ungroupedRoads.length > 0) {
+            groups.push([ungroupedRoads.pop()]);
+            groups[groups.length - 1]
+
+            for (let i = 0; i < groups[groups.length - 1].length; i++) {
+                const road = groups[groups.length - 1][i];
+                ungroupedRoads.filter(el => new Road(el.from, el.to).joins(road)).forEach(el => {
+                    groups[groups.length - 1].push(el);
+                });
+                ungroupedRoads = ungroupedRoads.filter(el => !new Road(el.from, el.to).joins(road));
+            }
+        }
+
+        this.connectedInts = [];
+        groups.forEach(group => {
+            this.connectedInts.push([]);
+            const groupNum = this.connectedInts.length - 1;
+            group.forEach(el => {
+                el.from.groupNum = groupNum;
+                el.to.groupNum = groupNum;
+                this.connectedInts[groupNum].push(el.from);
+                this.connectedInts[groupNum].push(el.to);
+            });
+
+            const dups = [];
+            this.connectedInts[groupNum] = this.connectedInts[groupNum].filter(function (el) {
+                if (dups.indexOf(el.id) == -1) {
+                    dups.push(el.id);
+                    return true;
+                }
+                return false;
+            });
         });
     }
 
@@ -323,18 +377,18 @@ export class Board {
 
     public onHover(x: number, y: number): void {
         // Remove the hover effect from the last cell hovered over
-        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.gridColor;
+        // this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
 
         // Draw the hover effect for this cell
-        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.hoverColor;
-        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.hoverColor;
+        // this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
 
         // If drawing a road then show how it will look
         if (this.roadStart) {
@@ -359,6 +413,7 @@ export class Board {
     }
 
     public fillPageWithCanvas(): void {
+        this.canvas.style
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
     }

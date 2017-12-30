@@ -33,8 +33,9 @@ export class Game {
             .distinctUntilChanged()
             .subscribe(e => {
                 const event = e as MouseEvent;
-                const x = event.clientX;
-                const y = event.clientY;
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
 
                 this.numClicks++;
                 this.board.planNewRoad(x, y);
@@ -56,7 +57,8 @@ export class Game {
         requestAnimationFrame(this.play);
         this.board.render();
         if (this.mouse) {
-            this.board.onHover(this.mouse.clientX, this.mouse.clientY);
+            const rect = this.canvas.getBoundingClientRect();
+            this.board.onHover(this.mouse.clientX - rect.left, this.mouse.clientY - rect.top);
         }
         this.vehicles.forEach(vehicle => {
             vehicle.move();

@@ -30,6 +30,12 @@ var Road = /** @class */ (function () {
     Road.prototype.length = function () {
         return this.to.distToCell(this.from);
     };
+    Road.prototype.contains = function (cell) {
+        return this.from.id === cell.id || this.to.id === cell.id;
+    };
+    Road.prototype.joins = function (b) {
+        return this.contains(b.from) || this.contains(b.to);
+    };
     Road.prototype.render = function (ctx) {
         ctx.beginPath();
         ctx.strokeStyle = this.style;
@@ -52,8 +58,8 @@ var Cell = /** @class */ (function () {
     function Cell(x, y) {
         this.x = x;
         this.y = y;
-        x = Math.round(x);
-        y = Math.round(y);
+        this.x = Math.round(x);
+        this.y = Math.round(y);
         this.id = this.hash(x, y);
     }
     Cell.prototype.hash = function (x, y) {

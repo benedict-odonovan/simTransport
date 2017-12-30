@@ -17,13 +17,14 @@ var Board = /** @class */ (function () {
         this.intersections = [];
         this.intSnapDistance = 30;
         this.intRadius = 10;
+        this.connectedInts = [];
         // Styles
         this.gridColor = 'rgb(240,240,240)';
         this.hoverColor = 'rgb(0,0,0)';
         this.pendingRoadColor = 'rgba(0,0,0,0.2)';
         this.intersectionColor = 'rgb(0,120,120)';
         this.fillPageWithCanvas();
-        this.initGrid();
+        //this.initGrid();
     }
     // Grid creation
     Board.prototype.initGrid = function () {
@@ -59,7 +60,7 @@ var Board = /** @class */ (function () {
             this.roadStart = null;
         }
     };
-    Board.prototype.getDistancePointToRoad = function (point, road) {
+    Board.prototype.getPointToRoadDist = function (point, road) {
         function sqr(x) { return x * x; }
         function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y); }
         function distToSegment(point, from, to) {
@@ -176,6 +177,7 @@ var Board = /** @class */ (function () {
         this.recalcRoadIds();
         this.removeDupRoads();
         this.removeDupIntersections();
+        this.groupConnectedRoads();
     };
     Board.prototype.splitRoad = function (road, intCell) {
         var road1 = new Cells_1.Road(road.from, intCell);
@@ -197,7 +199,7 @@ var Board = /** @class */ (function () {
         var point = new Cells_1.Cell(x, y);
         for (var i = 0; i < this.roads.length; i++) {
             var road = this.roads[i];
-            var res = this.getDistancePointToRoad(point, road);
+            var res = this.getPointToRoadDist(point, road);
             if (res.dist <= this.roadSnapDistance) {
                 return new Cells_1.Cell(res.x, res.y);
             }
@@ -223,6 +225,19 @@ var Board = /** @class */ (function () {
         });
         return { roads: roads, same: same, options: options };
     };
+    Board.prototype.findCellsInGroup = function (cell) {
+        if (cell.groupNum) {
+            return this.connectedInts[cell.groupNum].filter(function (el) { return el.id !== cell.id; });
+        }
+        else {
+            for (var i = 0; i < this.connectedInts.length; i++) {
+                var group = this.connectedInts[i];
+                if (group.map(function (el) { return el.id; }).indexOf(cell.id) > -1) {
+                    return group.filter(function (el) { return el.id !== cell.id; });
+                }
+            }
+        }
+    };
     Board.prototype.removeDupRoads = function () {
         var dups = [];
         this.roads = this.roads.filter(function (el) {
@@ -234,11 +249,6 @@ var Board = /** @class */ (function () {
         });
         // Remove roads that don't go anywhere
         this.roads = this.roads.filter(function (el) { return el.length() !== 0; });
-    };
-    Board.prototype.recalcRoadIds = function () {
-        this.roads.forEach(function (road) {
-            road.id = road.hash(road.from, road.to);
-        });
     };
     Board.prototype.removeDupIntersections = function () {
         var _this = this;
@@ -253,6 +263,49 @@ var Board = /** @class */ (function () {
                 return true;
             }
             return false;
+        });
+    };
+    Board.prototype.recalcRoadIds = function () {
+        this.roads.forEach(function (road) {
+            road.id = road.hash(road.from, road.to);
+        });
+    };
+    Board.prototype.groupConnectedRoads = function () {
+        var _this = this;
+        var ungroupedRoads = JSON.parse(JSON.stringify(this.roads));
+        var groups = [];
+        while (ungroupedRoads.length > 0) {
+            groups.push([ungroupedRoads.pop()]);
+            groups[groups.length - 1];
+            var _loop_1 = function (i) {
+                var road = groups[groups.length - 1][i];
+                ungroupedRoads.filter(function (el) { return new Cells_1.Road(el.from, el.to).joins(road); }).forEach(function (el) {
+                    groups[groups.length - 1].push(el);
+                });
+                ungroupedRoads = ungroupedRoads.filter(function (el) { return !new Cells_1.Road(el.from, el.to).joins(road); });
+            };
+            for (var i = 0; i < groups[groups.length - 1].length; i++) {
+                _loop_1(i);
+            }
+        }
+        this.connectedInts = [];
+        groups.forEach(function (group) {
+            _this.connectedInts.push([]);
+            var groupNum = _this.connectedInts.length - 1;
+            group.forEach(function (el) {
+                el.from.groupNum = groupNum;
+                el.to.groupNum = groupNum;
+                _this.connectedInts[groupNum].push(el.from);
+                _this.connectedInts[groupNum].push(el.to);
+            });
+            var dups = [];
+            _this.connectedInts[groupNum] = _this.connectedInts[groupNum].filter(function (el) {
+                if (dups.indexOf(el.id) == -1) {
+                    dups.push(el.id);
+                    return true;
+                }
+                return false;
+            });
         });
     };
     // Rendering
@@ -290,17 +343,17 @@ var Board = /** @class */ (function () {
     };
     Board.prototype.onHover = function (x, y) {
         // Remove the hover effect from the last cell hovered over
-        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.gridColor;
+        // this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
         // Draw the hover effect for this cell
-        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.hoverColor;
-        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.hoverColor;
+        // this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
         // If drawing a road then show how it will look
         if (this.roadStart) {
             this.ctx.beginPath();
@@ -320,6 +373,7 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: x, y: y };
     };
     Board.prototype.fillPageWithCanvas = function () {
+        this.canvas.style;
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
     };
@@ -342,37 +396,103 @@ var Car = /** @class */ (function () {
         this.board = board;
         this.pos = new Cells_1.Cell(0, 0);
         this.radius = 3;
-        this.speed = 5;
+        this.speed = 0.0;
+        this.topSpeed = 6.0;
+        this.acceleration = 0.01;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
+    Car.prototype.chooseFinalDest = function (current) {
+        var options = this.board.findCellsInGroup(current);
+        return options[Math.ceil(Math.random() * options.length) - 1];
+    };
+    Car.prototype.aStar = function (from, to) {
+        var closedSet = [];
+        var openSet = [from];
+        var cameFrom = {};
+        // For each node, the cost of getting from the start node to that node.
+        var distFromStart = {};
+        distFromStart[from.id] = 0;
+        // Straight line distance as a heuristic
+        function heuristicEstimate(a, b) {
+            return a.distToCell(b);
+        }
+        function reconstructPath(cameFrom, current) {
+            var totalPath = [current];
+            while (Object.keys(cameFrom).indexOf(current.id.toString()) > -1) {
+                current = cameFrom[current.id];
+                totalPath.push(current);
+            }
+            return totalPath;
+        }
+        // For each node, the total cost of getting from the start node to the goal
+        // by passing by that node. That value is partly known, partly heuristic.
+        var estTotalLengthVia = {};
+        estTotalLengthVia[from.id] = heuristicEstimate(from, to);
+        while (openSet.length > 0) {
+            // Current is the lowest fScore
+            var current = void 0;
+            current = openSet.sort(function (a, b) { return estTotalLengthVia[a.id] - estTotalLengthVia[b.id]; })[0];
+            // If we've reached the target
+            if (current.id === to.id) {
+                return reconstructPath(cameFrom, current);
+            }
+            openSet.splice(openSet.indexOf(current), 1);
+            closedSet.push(current);
+            var neighbours = this.board.findRoadsWithCell(current).options;
+            for (var i = 0; i < neighbours.length; i++) {
+                var neighbour = neighbours[i];
+                if (closedSet.map(function (el) { return el.id; }).indexOf(neighbour.id) === -1) {
+                    if (openSet.map(function (el) { return el.id; }).indexOf(neighbour.id) === -1) {
+                        openSet.push(neighbour);
+                    }
+                    var possibleGScore = distFromStart[current.id] + current.distToCell(neighbour);
+                    if (!distFromStart[neighbour.id] || possibleGScore < distFromStart[neighbour.id]) {
+                        distFromStart[neighbour.id] = possibleGScore;
+                        cameFrom[neighbour.id] = current;
+                        estTotalLengthVia[neighbour.id] = distFromStart[neighbour.id] + heuristicEstimate(neighbour, to);
+                    }
+                }
+            }
+        }
+        // Failed to find route
+        return null;
+    };
     // Get available options and set destination queue
     Car.prototype.chooseRoute = function () {
-        var options = this.board.findRoadsWithCell(this.currentCell).options;
-        this.destinationQueue = [];
-        var chosenOption = options[Math.ceil(Math.random() * options.length) - 1];
-        this.destinationQueue.push(chosenOption);
-        return this.destinationQueue[0];
+        var finalDest = this.chooseFinalDest(this.lastIntVisited);
+        this.destinationQueue = this.aStar(this.lastIntVisited, finalDest).reverse();
     };
     Car.prototype.move = function () {
-        // Either move to the destination exactly or clear the destination
         if (this.destinationQueue.length > 0) {
             var distX = this.destinationQueue[0].x - this.pos.x;
             var distY = this.destinationQueue[0].y - this.pos.y;
-            this.direction = Math.atan2(distY, distX);
-            if (Math.abs(distX) > this.speed + 2 || Math.abs(distY) > this.speed + 2) {
-                this.pos.x += this.speed * Math.cos(this.direction);
-                this.pos.y += this.speed * Math.sin(this.direction);
+            var totalDist = Math.abs(distX) + Math.abs(distY);
+            var stoppingDist = Math.pow(this.speed + this.acceleration * 2, 2) / (2.0 * this.acceleration);
+            console.log(stoppingDist);
+            // Accel, decel
+            if (totalDist > stoppingDist) {
+                this.speed += this.acceleration;
+            }
+            else if (totalDist <= stoppingDist) {
+                this.speed -= this.acceleration;
+            }
+            this.speed = Math.min(this.topSpeed, Math.max(0.0, this.speed));
+            if (totalDist >= 1) {
+                var angleToDest = Math.atan2(distY, distX);
+                this.pos.x += this.speed * Math.cos(angleToDest);
+                this.pos.y += this.speed * Math.sin(angleToDest);
             }
             else {
                 this.pos.x = this.destinationQueue[0].x;
                 this.pos.y = this.destinationQueue[0].y;
-                this.currentCell = this.destinationQueue[0];
+                this.lastIntVisited = this.destinationQueue[0];
                 this.destinationQueue.splice(0, 1);
             }
         }
         else {
+            // this.chooseFinalDest(this.lastIntVisited);
             this.chooseRoute();
-            this.move();
+            this.move(); // Move without hesitation
         }
     };
     Car.prototype.render = function (ctx) {
@@ -380,6 +500,16 @@ var Car = /** @class */ (function () {
         ctx.fillStyle = this.style;
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI, false);
         ctx.fill();
+        // this.destinationQueue.forEach(cell => {
+        //     ctx.beginPath();
+        //     ctx.fillStyle = this.style;
+        //     ctx.arc(cell.x, cell.y, 4, 0, 2 * Math.PI, false);
+        //     ctx.fill();
+        // });
+        // ctx.beginPath();
+        // ctx.fillStyle = this.style;
+        // ctx.arc(this.destinationQueue[this.destinationQueue.length - 1].x, this.destinationQueue[this.destinationQueue.length - 1].y, 7, 0, 2 * Math.PI, false);
+        // ctx.fill();
     };
     return Car;
 }());
@@ -418,6 +548,12 @@ var Road = /** @class */ (function () {
     Road.prototype.length = function () {
         return this.to.distToCell(this.from);
     };
+    Road.prototype.contains = function (cell) {
+        return this.from.id === cell.id || this.to.id === cell.id;
+    };
+    Road.prototype.joins = function (b) {
+        return this.contains(b.from) || this.contains(b.to);
+    };
     Road.prototype.render = function (ctx) {
         ctx.beginPath();
         ctx.strokeStyle = this.style;
@@ -440,8 +576,8 @@ var Cell = /** @class */ (function () {
     function Cell(x, y) {
         this.x = x;
         this.y = y;
-        x = Math.round(x);
-        y = Math.round(y);
+        this.x = Math.round(x);
+        this.y = Math.round(y);
         this.id = this.hash(x, y);
     }
     Cell.prototype.hash = function (x, y) {
@@ -477,7 +613,8 @@ var Game = /** @class */ (function () {
             requestAnimationFrame(_this.play);
             _this.board.render();
             if (_this.mouse) {
-                _this.board.onHover(_this.mouse.clientX, _this.mouse.clientY);
+                var rect = _this.canvas.getBoundingClientRect();
+                _this.board.onHover(_this.mouse.clientX - rect.left, _this.mouse.clientY - rect.top);
             }
             _this.vehicles.forEach(function (vehicle) {
                 vehicle.move();
@@ -499,8 +636,9 @@ var Game = /** @class */ (function () {
             .distinctUntilChanged()
             .subscribe(function (e) {
             var event = e;
-            var x = event.clientX;
-            var y = event.clientY;
+            var rect = _this.canvas.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
             _this.numClicks++;
             _this.board.planNewRoad(x, y);
             if (_this.board.roads.length > 0 && _this.numClicks % 2 === 0) {

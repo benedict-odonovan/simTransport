@@ -16,13 +16,14 @@ var Board = /** @class */ (function () {
         this.intersections = [];
         this.intSnapDistance = 30;
         this.intRadius = 10;
+        this.connectedInts = [];
         // Styles
         this.gridColor = 'rgb(240,240,240)';
         this.hoverColor = 'rgb(0,0,0)';
         this.pendingRoadColor = 'rgba(0,0,0,0.2)';
         this.intersectionColor = 'rgb(0,120,120)';
         this.fillPageWithCanvas();
-        this.initGrid();
+        //this.initGrid();
     }
     // Grid creation
     Board.prototype.initGrid = function () {
@@ -58,7 +59,7 @@ var Board = /** @class */ (function () {
             this.roadStart = null;
         }
     };
-    Board.prototype.getDistancePointToRoad = function (point, road) {
+    Board.prototype.getPointToRoadDist = function (point, road) {
         function sqr(x) { return x * x; }
         function dist2(v, w) { return sqr(v.x - w.x) + sqr(v.y - w.y); }
         function distToSegment(point, from, to) {
@@ -175,6 +176,7 @@ var Board = /** @class */ (function () {
         this.recalcRoadIds();
         this.removeDupRoads();
         this.removeDupIntersections();
+        this.groupConnectedRoads();
     };
     Board.prototype.splitRoad = function (road, intCell) {
         var road1 = new Cells_1.Road(road.from, intCell);
@@ -196,7 +198,7 @@ var Board = /** @class */ (function () {
         var point = new Cells_1.Cell(x, y);
         for (var i = 0; i < this.roads.length; i++) {
             var road = this.roads[i];
-            var res = this.getDistancePointToRoad(point, road);
+            var res = this.getPointToRoadDist(point, road);
             if (res.dist <= this.roadSnapDistance) {
                 return new Cells_1.Cell(res.x, res.y);
             }
@@ -222,6 +224,19 @@ var Board = /** @class */ (function () {
         });
         return { roads: roads, same: same, options: options };
     };
+    Board.prototype.findCellsInGroup = function (cell) {
+        if (cell.groupNum) {
+            return this.connectedInts[cell.groupNum].filter(function (el) { return el.id !== cell.id; });
+        }
+        else {
+            for (var i = 0; i < this.connectedInts.length; i++) {
+                var group = this.connectedInts[i];
+                if (group.map(function (el) { return el.id; }).indexOf(cell.id) > -1) {
+                    return group.filter(function (el) { return el.id !== cell.id; });
+                }
+            }
+        }
+    };
     Board.prototype.removeDupRoads = function () {
         var dups = [];
         this.roads = this.roads.filter(function (el) {
@@ -233,11 +248,6 @@ var Board = /** @class */ (function () {
         });
         // Remove roads that don't go anywhere
         this.roads = this.roads.filter(function (el) { return el.length() !== 0; });
-    };
-    Board.prototype.recalcRoadIds = function () {
-        this.roads.forEach(function (road) {
-            road.id = road.hash(road.from, road.to);
-        });
     };
     Board.prototype.removeDupIntersections = function () {
         var _this = this;
@@ -252,6 +262,49 @@ var Board = /** @class */ (function () {
                 return true;
             }
             return false;
+        });
+    };
+    Board.prototype.recalcRoadIds = function () {
+        this.roads.forEach(function (road) {
+            road.id = road.hash(road.from, road.to);
+        });
+    };
+    Board.prototype.groupConnectedRoads = function () {
+        var _this = this;
+        var ungroupedRoads = JSON.parse(JSON.stringify(this.roads));
+        var groups = [];
+        while (ungroupedRoads.length > 0) {
+            groups.push([ungroupedRoads.pop()]);
+            groups[groups.length - 1];
+            var _loop_1 = function (i) {
+                var road = groups[groups.length - 1][i];
+                ungroupedRoads.filter(function (el) { return new Cells_1.Road(el.from, el.to).joins(road); }).forEach(function (el) {
+                    groups[groups.length - 1].push(el);
+                });
+                ungroupedRoads = ungroupedRoads.filter(function (el) { return !new Cells_1.Road(el.from, el.to).joins(road); });
+            };
+            for (var i = 0; i < groups[groups.length - 1].length; i++) {
+                _loop_1(i);
+            }
+        }
+        this.connectedInts = [];
+        groups.forEach(function (group) {
+            _this.connectedInts.push([]);
+            var groupNum = _this.connectedInts.length - 1;
+            group.forEach(function (el) {
+                el.from.groupNum = groupNum;
+                el.to.groupNum = groupNum;
+                _this.connectedInts[groupNum].push(el.from);
+                _this.connectedInts[groupNum].push(el.to);
+            });
+            var dups = [];
+            _this.connectedInts[groupNum] = _this.connectedInts[groupNum].filter(function (el) {
+                if (dups.indexOf(el.id) == -1) {
+                    dups.push(el.id);
+                    return true;
+                }
+                return false;
+            });
         });
     };
     // Rendering
@@ -289,17 +342,17 @@ var Board = /** @class */ (function () {
     };
     Board.prototype.onHover = function (x, y) {
         // Remove the hover effect from the last cell hovered over
-        this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.gridColor;
-        this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(this.lastHovered.x - 1, this.lastHovered.y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.gridColor;
+        // this.ctx.strokeRect(this.lastHovered.x, this.lastHovered.y, this.gridSize - 1, this.gridSize - 1);
         // Draw the hover effect for this cell
-        this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
-        this.ctx.beginPath();
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = this.hoverColor;
-        this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
+        // this.ctx.clearRect(x - 1, y - 1, this.gridSize + 1, this.gridSize + 1);
+        // this.ctx.beginPath();
+        // this.ctx.lineWidth = 1;
+        // this.ctx.strokeStyle = this.hoverColor;
+        // this.ctx.strokeRect(x, y, this.gridSize - 1, this.gridSize - 1);
         // If drawing a road then show how it will look
         if (this.roadStart) {
             this.ctx.beginPath();
@@ -319,6 +372,7 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: x, y: y };
     };
     Board.prototype.fillPageWithCanvas = function () {
+        this.canvas.style;
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
     };
