@@ -2,9 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var Cells_1 = require("./Cells");
 var Board = /** @class */ (function () {
-    function Board(canvas, ctx) {
+    function Board(canvas, ctx, scale) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.scale = scale;
         // Grid
         this.gridSize = 5; // Pixels
         this.lastHovered = { x: 0, y: 0 };
@@ -372,9 +373,11 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: x, y: y };
     };
     Board.prototype.fillPageWithCanvas = function () {
-        this.canvas.style;
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.canvas.style.height = '100%';
+        this.canvas.style.width = '100%';
+        this.canvas.width = this.canvas.offsetWidth * this.scale;
+        this.canvas.height = this.canvas.offsetHeight * this.scale;
+        this.ctx.scale(this.scale, this.scale);
     };
     Board.prototype.render = function () {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);

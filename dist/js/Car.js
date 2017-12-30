@@ -8,7 +8,7 @@ var Car = /** @class */ (function () {
         this.radius = 3;
         this.speed = 0.0;
         this.topSpeed = 6.0;
-        this.acceleration = 0.01;
+        this.acceleration = 0.02;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
     Car.prototype.chooseFinalDest = function (current) {
@@ -77,8 +77,11 @@ var Car = /** @class */ (function () {
             var distX = this.destinationQueue[0].x - this.pos.x;
             var distY = this.destinationQueue[0].y - this.pos.y;
             var totalDist = Math.abs(distX) + Math.abs(distY);
-            var stoppingDist = Math.pow(this.speed + this.acceleration * 2, 2) / (2.0 * this.acceleration);
-            console.log(stoppingDist);
+            // Calculate when you need to slow down
+            // s = v^2 / 2*a
+            // v = ((v0^2)-2*a*s)^(1/2)
+            var stoppingDist = Math.pow(this.speed, 2) / (2.0 * this.acceleration);
+            var maxStoppingSpeed = Math.sqrt(Math.pow(this.speed, 2) + (2 * this.acceleration * totalDist));
             // Accel, decel
             if (totalDist > stoppingDist) {
                 this.speed += this.acceleration;
@@ -86,7 +89,7 @@ var Car = /** @class */ (function () {
             else if (totalDist <= stoppingDist) {
                 this.speed -= this.acceleration;
             }
-            this.speed = Math.min(this.topSpeed, Math.max(0.0, this.speed));
+            this.speed = Math.min(maxStoppingSpeed, Math.min(this.topSpeed, Math.max(0.0, this.speed)));
             if (totalDist >= 1) {
                 var angleToDest = Math.atan2(distY, distX);
                 this.pos.x += this.speed * Math.cos(angleToDest);
@@ -95,6 +98,7 @@ var Car = /** @class */ (function () {
             else {
                 this.pos.x = this.destinationQueue[0].x;
                 this.pos.y = this.destinationQueue[0].y;
+                this.speed = 0;
                 this.lastIntVisited = this.destinationQueue[0];
                 this.destinationQueue.splice(0, 1);
             }
@@ -102,7 +106,7 @@ var Car = /** @class */ (function () {
         else {
             // this.chooseFinalDest(this.lastIntVisited);
             this.chooseRoute();
-            this.move(); // Move without hesitation
+            //this.move(); // Move without hesitation
         }
     };
     Car.prototype.render = function (ctx) {

@@ -1,0 +1,38 @@
+body {
+    margin: 0;
+}
+
+#framework {
+    position: absolute; 
+    width: 100%; 
+    height: 100%;
+}
+
+#toolbar {
+    height: 2em;
+}
+
+#toolbarFlex {
+    display: flex;
+    justify-content: space-around;
+}
+
+#sidebar {
+    width: 3em;
+}
+
+#sidebarFlex {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+
+.sidebarNum {
+    margin: 1em 0;
+}
+
+#cnvsContainer {
+    border: 1px black solid;
+    height: calc(100vh - 3em);
+}
+

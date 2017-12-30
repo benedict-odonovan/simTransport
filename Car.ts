@@ -8,7 +8,7 @@ export class Car implements Vehicle {
     public radius = 3;
     public speed = 0.0;
     public topSpeed = 6.0;
-    public acceleration = 0.01;
+    public acceleration = 0.02;
     public destinationQueue: Cell[];
     public lastIntVisited: Cell;
     public style: string;
@@ -98,7 +98,12 @@ export class Car implements Vehicle {
             const distX = this.destinationQueue[0].x - this.pos.x;
             const distY = this.destinationQueue[0].y - this.pos.y;
             const totalDist = Math.abs(distX) + Math.abs(distY);
-            const stoppingDist = Math.pow(this.speed + this.acceleration * 2, 2) / (2.0 * this.acceleration);
+
+            // Calculate when you need to slow down
+            // s = v^2 / 2*a
+            // v = ((v0^2)-2*a*s)^(1/2)
+            const stoppingDist = Math.pow(this.speed, 2) / (2.0 * this.acceleration);
+            const maxStoppingSpeed = Math.sqrt(Math.pow(this.speed, 2) + (2 * this.acceleration * totalDist));
 
             // Accel, decel
             if (totalDist > stoppingDist) {
@@ -106,7 +111,7 @@ export class Car implements Vehicle {
             } else if (totalDist <= stoppingDist) {
                 this.speed -= this.acceleration;
             }
-            this.speed = Math.min(this.topSpeed, Math.max(0.0, this.speed));
+            this.speed = Math.min(maxStoppingSpeed, Math.min(this.topSpeed, Math.max(0.0, this.speed)));
 
             if (totalDist >= 1) {
                 const angleToDest = Math.atan2(distY, distX);
@@ -115,13 +120,14 @@ export class Car implements Vehicle {
             } else {
                 this.pos.x = this.destinationQueue[0].x;
                 this.pos.y = this.destinationQueue[0].y;
+                this.speed = 0;
                 this.lastIntVisited = this.destinationQueue[0];
                 this.destinationQueue.splice(0, 1);
             }
         } else {
             // this.chooseFinalDest(this.lastIntVisited);
             this.chooseRoute();
-            this.move(); // Move without hesitation
+            //this.move(); // Move without hesitation
         }
     }
 

@@ -3,9 +3,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var Cells_1 = require("./Cells");
 var Board = /** @class */ (function () {
-    function Board(canvas, ctx) {
+    function Board(canvas, ctx, scale) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.scale = scale;
         // Grid
         this.gridSize = 5; // Pixels
         this.lastHovered = { x: 0, y: 0 };
@@ -373,9 +374,11 @@ var Board = /** @class */ (function () {
         this.lastHovered = { x: x, y: y };
     };
     Board.prototype.fillPageWithCanvas = function () {
-        this.canvas.style;
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.canvas.style.height = '100%';
+        this.canvas.style.width = '100%';
+        this.canvas.width = this.canvas.offsetWidth * this.scale;
+        this.canvas.height = this.canvas.offsetHeight * this.scale;
+        this.ctx.scale(this.scale, this.scale);
     };
     Board.prototype.render = function () {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -398,7 +401,7 @@ var Car = /** @class */ (function () {
         this.radius = 3;
         this.speed = 0.0;
         this.topSpeed = 6.0;
-        this.acceleration = 0.01;
+        this.acceleration = 0.02;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
     Car.prototype.chooseFinalDest = function (current) {
@@ -467,8 +470,11 @@ var Car = /** @class */ (function () {
             var distX = this.destinationQueue[0].x - this.pos.x;
             var distY = this.destinationQueue[0].y - this.pos.y;
             var totalDist = Math.abs(distX) + Math.abs(distY);
-            var stoppingDist = Math.pow(this.speed + this.acceleration * 2, 2) / (2.0 * this.acceleration);
-            console.log(stoppingDist);
+            // Calculate when you need to slow down
+            // s = v^2 / 2*a
+            // v = ((v0^2)-2*a*s)^(1/2)
+            var stoppingDist = Math.pow(this.speed, 2) / (2.0 * this.acceleration);
+            var maxStoppingSpeed = Math.sqrt(Math.pow(this.speed, 2) + (2 * this.acceleration * totalDist));
             // Accel, decel
             if (totalDist > stoppingDist) {
                 this.speed += this.acceleration;
@@ -476,7 +482,7 @@ var Car = /** @class */ (function () {
             else if (totalDist <= stoppingDist) {
                 this.speed -= this.acceleration;
             }
-            this.speed = Math.min(this.topSpeed, Math.max(0.0, this.speed));
+            this.speed = Math.min(maxStoppingSpeed, Math.min(this.topSpeed, Math.max(0.0, this.speed)));
             if (totalDist >= 1) {
                 var angleToDest = Math.atan2(distY, distX);
                 this.pos.x += this.speed * Math.cos(angleToDest);
@@ -485,6 +491,7 @@ var Car = /** @class */ (function () {
             else {
                 this.pos.x = this.destinationQueue[0].x;
                 this.pos.y = this.destinationQueue[0].y;
+                this.speed = 0;
                 this.lastIntVisited = this.destinationQueue[0];
                 this.destinationQueue.splice(0, 1);
             }
@@ -492,7 +499,7 @@ var Car = /** @class */ (function () {
         else {
             // this.chooseFinalDest(this.lastIntVisited);
             this.chooseRoute();
-            this.move(); // Move without hesitation
+            //this.move(); // Move without hesitation
         }
     };
     Car.prototype.render = function (ctx) {
@@ -610,6 +617,8 @@ var Game = /** @class */ (function () {
         var _this = this;
         this.numClicks = 0;
         this.play = function () {
+            // AA fix
+            _this.ctx.translate(0.5, 0.5);
             requestAnimationFrame(_this.play);
             _this.board.render();
             if (_this.mouse) {
@@ -620,21 +629,37 @@ var Game = /** @class */ (function () {
                 vehicle.move();
                 vehicle.render(_this.ctx);
             });
+            // AA fix reset
+            _this.ctx.translate(-0.5, -0.5);
         };
         this.canvas = document.getElementById("cnvs");
         this.ctx = this.canvas.getContext("2d");
-        this.board = new Board_1.Board(this.canvas, this.ctx);
+        this.board = new Board_1.Board(this.canvas, this.ctx, 3);
         this.vehicles = [];
-        Rx.Observable.fromEvent(this.canvas, 'mousemove')
-            .throttleTime(10)
-            .distinctUntilChanged()
-            .subscribe(function (e) {
-            _this.mouse = e;
+        var mouseDown = false;
+        var startX = 0;
+        var startY = 0;
+        Rx.Observable.fromEvent(this.canvas, 'mousedown').subscribe(function (e) {
+            mouseDown = true;
+            var m = e;
+            startX = m.clientX;
+            startY = m.clientY;
         });
-        Rx.Observable.fromEvent(this.canvas, 'click')
+        Rx.Observable.fromEvent(this.canvas, 'mousemove').subscribe(function (e) {
+            _this.mouse = e;
+            // If it's a drag 
+            if (mouseDown && Math.abs(_this.mouse.clientX - startX) + Math.abs(_this.mouse.clientY - startY) > 10) {
+                mouseDown = false;
+                var rect = _this.canvas.getBoundingClientRect();
+                _this.numClicks++;
+                _this.board.planNewRoad(startX - rect.left, startY - rect.top);
+            }
+        });
+        Rx.Observable.fromEvent(this.canvas, 'mouseup')
             .throttleTime(10)
             .distinctUntilChanged()
             .subscribe(function (e) {
+            mouseDown = false;
             var event = e;
             var rect = _this.canvas.getBoundingClientRect();
             var x = event.clientX - rect.left;
@@ -661,7 +686,13 @@ exports.Game = Game;
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var Game_1 = require("./Game");
-window.onload = function () { var game = new Game_1.Game(); game.play(); };
+window.onload = function () {
+    var game = new Game_1.Game();
+    game.play();
+    window.onresize = function () {
+        game.board.fillPageWithCanvas();
+    };
+};
 
 },{"./Game":4}],6:[function(require,module,exports){
 "use strict";

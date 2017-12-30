@@ -25,7 +25,7 @@ export class Board {
     public pendingRoadColor = 'rgba(0,0,0,0.2)';
     public intersectionColor = 'rgb(0,120,120)';
 
-    constructor(public canvas: HTMLCanvasElement, public ctx: CanvasRenderingContext2D) {
+    constructor(public canvas: HTMLCanvasElement, public ctx: CanvasRenderingContext2D, public scale: number) {
         this.fillPageWithCanvas();
         //this.initGrid();
     }
@@ -413,9 +413,11 @@ export class Board {
     }
 
     public fillPageWithCanvas(): void {
-        this.canvas.style
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.canvas.style.height = '100%';
+        this.canvas.style.width = '100%';
+        this.canvas.width = this.canvas.offsetWidth * this.scale;
+        this.canvas.height = this.canvas.offsetHeight * this.scale;
+        this.ctx.scale(this.scale, this.scale);
     }
 
     public render(): void {
