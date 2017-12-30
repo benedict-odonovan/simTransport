@@ -17,7 +17,7 @@ var Board = /** @class */ (function () {
         // Intersections
         this.intersections = [];
         this.intSnapDistance = 30;
-        this.intRadius = 10;
+        this.intRadius = 7;
         this.connectedInts = [];
         // Styles
         this.gridColor = 'rgb(240,240,240)';
@@ -315,7 +315,6 @@ var Board = /** @class */ (function () {
         this.roads.forEach(function (road) {
             road.render(_this.ctx);
         });
-        this.drawIntersections();
     };
     Board.prototype.drawIntersections = function () {
         var _this = this;
@@ -400,8 +399,8 @@ var Car = /** @class */ (function () {
         this.pos = new Cells_1.Cell(0, 0);
         this.radius = 3;
         this.speed = 0.0;
-        this.topSpeed = 6.0;
-        this.acceleration = 0.02;
+        this.topSpeed = 7.0;
+        this.acceleration = 0.03;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
     Car.prototype.chooseFinalDest = function (current) {
@@ -506,7 +505,6 @@ var Car = /** @class */ (function () {
         ctx.beginPath();
         ctx.fillStyle = this.style;
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI, false);
-        ctx.fill();
         // this.destinationQueue.forEach(cell => {
         //     ctx.beginPath();
         //     ctx.fillStyle = this.style;
@@ -628,19 +626,41 @@ var Game = /** @class */ (function () {
             _this.vehicles.forEach(function (vehicle) {
                 vehicle.move();
                 vehicle.render(_this.ctx);
+                _this.ctx.fill();
             });
+            _this.updateVehicleCount();
             // AA fix reset
             _this.ctx.translate(-0.5, -0.5);
         };
+        // Rendering elements
         this.canvas = document.getElementById("cnvs");
         this.ctx = this.canvas.getContext("2d");
+        // Keeping track of components
         this.board = new Board_1.Board(this.canvas, this.ctx, 3);
         this.vehicles = [];
-        var mouseDown = false;
+        // UI Configs
+        this.numCars = document.getElementById('numCars');
+        this.numCars.value = '0';
+        this.acc = document.getElementById('acc');
+        this.acc.value = '0.03';
+        this.topSpeed = document.getElementById('topSpeed');
+        this.topSpeed.value = '7';
+        Rx.Observable.fromEvent(this.acc, 'change').subscribe(function () {
+            _this.vehicles.forEach(function (vehicle) {
+                vehicle.acceleration = +_this.acc.value;
+            });
+        });
+        Rx.Observable.fromEvent(this.topSpeed, 'change').subscribe(function () {
+            _this.vehicles.forEach(function (vehicle) {
+                vehicle.topSpeed = +_this.topSpeed.value;
+            });
+        });
+        // For managing drag and drops vs clicks
+        var startDrag = false;
         var startX = 0;
         var startY = 0;
         Rx.Observable.fromEvent(this.canvas, 'mousedown').subscribe(function (e) {
-            mouseDown = true;
+            startDrag = true;
             var m = e;
             startX = m.clientX;
             startY = m.clientY;
@@ -648,8 +668,8 @@ var Game = /** @class */ (function () {
         Rx.Observable.fromEvent(this.canvas, 'mousemove').subscribe(function (e) {
             _this.mouse = e;
             // If it's a drag 
-            if (mouseDown && Math.abs(_this.mouse.clientX - startX) + Math.abs(_this.mouse.clientY - startY) > 10) {
-                mouseDown = false;
+            if (startDrag && Math.abs(_this.mouse.clientX - startX) + Math.abs(_this.mouse.clientY - startY) > 10) {
+                startDrag = false;
                 var rect = _this.canvas.getBoundingClientRect();
                 _this.numClicks++;
                 _this.board.planNewRoad(startX - rect.left, startY - rect.top);
@@ -659,7 +679,7 @@ var Game = /** @class */ (function () {
             .throttleTime(10)
             .distinctUntilChanged()
             .subscribe(function (e) {
-            mouseDown = false;
+            startDrag = false;
             var event = e;
             var rect = _this.canvas.getBoundingClientRect();
             var x = event.clientX - rect.left;
@@ -667,16 +687,28 @@ var Game = /** @class */ (function () {
             _this.numClicks++;
             _this.board.planNewRoad(x, y);
             if (_this.board.roads.length > 0 && _this.numClicks % 2 === 0) {
-                _this.addVehicle();
+                _this.addVehicle(true);
             }
         });
     }
-    Game.prototype.addVehicle = function () {
+    Game.prototype.addVehicle = function (updateUi) {
         var newVehicle = new Car_1.Car(this.board);
         newVehicle.pos.x = this.board.roads[0].from.x;
         newVehicle.pos.y = this.board.roads[0].from.y;
         newVehicle.destinationQueue = [this.board.roads[0].to];
         this.vehicles.push(newVehicle);
+        // Prevent conflict with user changing numCars value themselves
+        if (updateUi) {
+            this.numCars.value = (+this.numCars.value + 1).toString();
+        }
+    };
+    Game.prototype.updateVehicleCount = function () {
+        if (+this.numCars.value > this.vehicles.length) {
+            this.addVehicle(false);
+        }
+        if (+this.numCars.value < this.vehicles.length) {
+            this.vehicles.pop();
+        }
     };
     return Game;
 }());

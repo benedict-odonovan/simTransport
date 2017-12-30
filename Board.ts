@@ -16,7 +16,7 @@ export class Board {
     // Intersections
     public intersections: Cell[] = [];
     public intSnapDistance = 30;
-    public intRadius = 10;
+    public intRadius = 7;
     public connectedInts: Cell[][] = [];
 
     // Styles
@@ -346,7 +346,6 @@ export class Board {
         this.roads.forEach(road => {
             road.render(this.ctx);
         });
-        this.drawIntersections();
     }
 
     public drawIntersections(): void {

@@ -7,8 +7,8 @@ var Car = /** @class */ (function () {
         this.pos = new Cells_1.Cell(0, 0);
         this.radius = 3;
         this.speed = 0.0;
-        this.topSpeed = 6.0;
-        this.acceleration = 0.02;
+        this.topSpeed = 7.0;
+        this.acceleration = 0.03;
         this.style = 'rgb(' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ',' + Math.round(Math.random() * 125 + 125) + ')';
     }
     Car.prototype.chooseFinalDest = function (current) {
@@ -113,7 +113,6 @@ var Car = /** @class */ (function () {
         ctx.beginPath();
         ctx.fillStyle = this.style;
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI, false);
-        ctx.fill();
         // this.destinationQueue.forEach(cell => {
         //     ctx.beginPath();
         //     ctx.fillStyle = this.style;

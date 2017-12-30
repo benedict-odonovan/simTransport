@@ -16,7 +16,7 @@ var Board = /** @class */ (function () {
         // Intersections
         this.intersections = [];
         this.intSnapDistance = 30;
-        this.intRadius = 10;
+        this.intRadius = 7;
         this.connectedInts = [];
         // Styles
         this.gridColor = 'rgb(240,240,240)';
@@ -314,7 +314,6 @@ var Board = /** @class */ (function () {
         this.roads.forEach(function (road) {
             road.render(_this.ctx);
         });
-        this.drawIntersections();
     };
     Board.prototype.drawIntersections = function () {
         var _this = this;

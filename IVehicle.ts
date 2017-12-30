@@ -5,6 +5,9 @@ export interface Vehicle {
     id: string;
     board: Board;
     pos: Cell;
+    acceleration: number;
+    topSpeed: number;
+
 
     move(): void;
     render(ctx: CanvasRenderingContext2D): void;

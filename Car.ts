@@ -7,8 +7,8 @@ export class Car implements Vehicle {
     public pos = new Cell(0, 0);
     public radius = 3;
     public speed = 0.0;
-    public topSpeed = 6.0;
-    public acceleration = 0.02;
+    public topSpeed = 7.0;
+    public acceleration = 0.03;
     public destinationQueue: Cell[];
     public lastIntVisited: Cell;
     public style: string;
@@ -135,7 +135,7 @@ export class Car implements Vehicle {
         ctx.beginPath();
         ctx.fillStyle = this.style;
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, 2 * Math.PI, false);
-        ctx.fill();
+
 
         // this.destinationQueue.forEach(cell => {
         //     ctx.beginPath();
