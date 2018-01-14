@@ -106,4 +106,10 @@ var Game = /** @class */ (function () {
     return Game;
 }());
 exports.Game = Game;
+var Mode;
+(function (Mode) {
+    Mode[Mode["build"] = 0] = "build";
+    Mode[Mode["info"] = 1] = "info";
+    Mode[Mode["delete"] = 2] = "delete";
+})(Mode || (Mode = {}));
 //# sourceMappingURL=Game.js.map

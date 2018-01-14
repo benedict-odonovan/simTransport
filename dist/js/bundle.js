@@ -468,12 +468,10 @@ var Car = /** @class */ (function () {
         if (this.destinationQueue.length > 0) {
             var distX = this.destinationQueue[0].x - this.pos.x;
             var distY = this.destinationQueue[0].y - this.pos.y;
-            var totalDist = Math.abs(distX) + Math.abs(distY);
+            var totalDist = +(Math.sqrt(Math.pow(distX, 2) + Math.pow(distY, 2))).toFixed(5);
             // Calculate when you need to slow down
-            // s = v^2 / 2*a
-            // v = ((v0^2)-2*a*s)^(1/2)
-            var stoppingDist = Math.pow(this.speed, 2) / (2.0 * this.acceleration);
-            var maxStoppingSpeed = Math.sqrt(Math.pow(this.speed, 2) + (2 * this.acceleration * totalDist));
+            var stoppingDist = Math.pow(this.speed + (this.acceleration * 2), 2) / (2.0 * this.acceleration);
+            stoppingDist = +stoppingDist.toFixed(5);
             // Accel, decel
             if (totalDist > stoppingDist) {
                 this.speed += this.acceleration;
@@ -481,8 +479,9 @@ var Car = /** @class */ (function () {
             else if (totalDist <= stoppingDist) {
                 this.speed -= this.acceleration;
             }
-            this.speed = Math.min(maxStoppingSpeed, Math.min(this.topSpeed, Math.max(0.0, this.speed)));
-            if (totalDist >= 1) {
+            this.speed = +this.speed.toFixed(5);
+            this.speed = Math.min(this.topSpeed, Math.max(0.0, this.speed));
+            if (totalDist >= 0.3) {
                 var angleToDest = Math.atan2(distY, distX);
                 this.pos.x += this.speed * Math.cos(angleToDest);
                 this.pos.y += this.speed * Math.sin(angleToDest);
@@ -598,7 +597,7 @@ var Cell = /** @class */ (function () {
         return hash;
     };
     Cell.prototype.distToCell = function (b) {
-        return Math.abs(this.x - b.x) + Math.abs(this.y - b.y);
+        return Math.sqrt(Math.pow(this.x - b.x, 2) + Math.pow(this.y - b.y, 2));
     };
     return Cell;
 }());
@@ -713,6 +712,12 @@ var Game = /** @class */ (function () {
     return Game;
 }());
 exports.Game = Game;
+var Mode;
+(function (Mode) {
+    Mode[Mode["build"] = 0] = "build";
+    Mode[Mode["info"] = 1] = "info";
+    Mode[Mode["delete"] = 2] = "delete";
+})(Mode || (Mode = {}));
 
 },{"./Board":1,"./Car":2,"rxjs":14}],5:[function(require,module,exports){
 "use strict";

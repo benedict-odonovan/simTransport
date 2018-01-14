@@ -75,7 +75,7 @@ var Cell = /** @class */ (function () {
         return hash;
     };
     Cell.prototype.distToCell = function (b) {
-        return Math.abs(this.x - b.x) + Math.abs(this.y - b.y);
+        return Math.sqrt(Math.pow(this.x - b.x, 2) + Math.pow(this.y - b.y, 2));
     };
     return Cell;
 }());
